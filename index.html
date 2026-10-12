@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f6b55">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="إيجارات كرم مول">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+<title>إيجارات كرم مول</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&display=swap">
+<style>
+/* Layout: RTL operations console — sticky header + tabs, summary first, tables & stage board below, side drawer for records */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --surface-2:#eef2f0; --line:#d9e0dc; --fg:#17211d; --muted:#5d6b65;
+  --accent:#0f6b55; --accent-ink:#ffffff; --accent-soft:#dcefe8; --brass:#9a6a12;
+  --ok:#1d7a46; --ok-soft:#dff3e6; --warn:#a15c00; --warn-soft:#fdf0d9; --bad:#b4282d; --bad-soft:#fbe3e3; --info:#2456a6; --info-soft:#e2ebfa;
+  --shadow:0 8px 30px rgba(10,30,22,.14);
+  --f-display:"Readex Pro","IBM Plex Sans Arabic",Tahoma,sans-serif;
+  --f-body:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1513; --surface:#161e1b; --surface-2:#1d2723; --line:#2b3833; --fg:#e4ece8; --muted:#94a59d;
+  --accent:#3fbf98; --accent-ink:#06231a; --accent-soft:#163a30; --brass:#d6a54c;
+  --ok:#5cd08f; --ok-soft:#163625; --warn:#f0a948; --warn-soft:#3a2a12; --bad:#f07a7d; --bad-soft:#3d1a1c; --info:#7fa8f0; --info-soft:#1a2740;
+  --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1513; --surface:#161e1b; --surface-2:#1d2723; --line:#2b3833; --fg:#e4ece8; --muted:#94a59d;
+  --accent:#3fbf98; --accent-ink:#06231a; --accent-soft:#163a30; --brass:#d6a54c;
+  --ok:#5cd08f; --ok-soft:#163625; --warn:#f0a948; --warn-soft:#3a2a12; --bad:#f07a7d; --bad-soft:#3d1a1c; --info:#7fa8f0; --info-soft:#1a2740;
+  --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:14px;line-height:1.55}
+.num,td.n,.kpi b{font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+.wrap{max-width:1320px;margin:0 auto;padding-inline:16px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:12px}
+.brand{display:flex;flex-direction:column;margin-inline-end:auto;min-width:0}
+.brand h1{font-family:var(--f-display);font-size:20px;margin:0;font-weight:700;letter-spacing:0}
+.brand span{color:var(--muted);font-size:12px}
+.sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--ok)}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav.tabs button{background:none;border:0;padding:10px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;font-weight:500}
+nav.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+nav.tabs .cnt{font-size:11px;background:var(--surface-2);border-radius:10px;padding:1px 7px;margin-inline-start:6px}
+.btn{border:1px solid var(--line);background:var(--surface);padding:7px 12px;border-radius:8px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.sm{padding:4px 9px;font-size:12px;border-radius:6px}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.danger{color:var(--bad)}
+.btn:focus-visible,nav.tabs button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+main{padding-block:20px 60px}
+section.view{display:flex;flex-direction:column;gap:18px}
+.notice{background:var(--warn-soft);color:var(--warn);padding:10px 14px;border-radius:8px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;cursor:pointer;text-align:start}
+.kpi small{color:var(--muted);font-size:12px}
+.kpi b{font-family:var(--f-display);font-size:24px;font-weight:600}
+.kpi i{font-style:normal;color:var(--muted);font-size:12px}
+.kpi.bad b{color:var(--bad)} .kpi.warn b{color:var(--warn)} .kpi.info b{color:var(--info)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.panel h2{font-family:var(--f-display);font-size:15px;margin:0 0 12px;font-weight:600;display:flex;align-items:center;gap:8px}
+.panel h2 .sub{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:12px;margin-inline-start:auto}
+.hbar{display:grid;grid-template-columns:minmax(110px,150px) 1fr auto;gap:10px;align-items:center;padding:5px 0;font-size:13px}
+.hbar .track{height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.hbar .fill{height:100%;background:var(--accent);border-radius:5px}
+.hbar .v{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px;min-width:110px;text-align:end}
+.cols{display:flex;align-items:flex-end;gap:10px;height:170px;padding-top:10px;border-bottom:1px solid var(--line)}
+.cols .c{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;min-width:0}
+.cols .c .b{width:70%;max-width:46px;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.cols .c span{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.colx{display:flex;gap:10px;padding-top:6px}.colx span{flex:1;text-align:center;font-size:12px;color:var(--muted)}
+.todo{display:flex;flex-direction:column}
+.todo .it{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+.todo .it:first-child{border-top:0}
+.todo .it .t{flex:1;min-width:0}
+.todo .it .t b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.todo .it .t small{color:var(--muted)}
+.empty{color:var(--muted);padding:18px 0;text-align:center}
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:500;white-space:nowrap}
+.p-paid{background:var(--ok-soft);color:var(--ok)} .p-due{background:var(--warn-soft);color:var(--warn)}
+.p-late{background:var(--bad-soft);color:var(--bad)} .p-up{background:var(--info-soft);color:var(--info)}
+.p-mute{background:var(--surface-2);color:var(--muted)} .p-acc{background:var(--accent-soft);color:var(--accent)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar input[type=search],.toolbar select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px;min-width:0}
+.toolbar input[type=search]{flex:1 1 220px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 10px;text-align:start;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-weight:600;color:var(--muted);font-size:12px;background:var(--surface-2);position:sticky;top:0;white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+td.n{white-space:nowrap}
+td .nm{font-weight:500;max-width:300px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td .note{color:var(--muted);font-size:12px;max-width:260px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tfoot td{font-weight:600;background:var(--surface-2)}
+.sla{font-size:11px;color:var(--muted)} .sla.over{color:var(--bad);font-weight:600}
+.board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}
+.lane{flex:0 0 250px;background:var(--surface-2);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:140px}
+.lane.drop{outline:2px dashed var(--accent)}
+.lane header{display:flex;flex-direction:column;gap:2px;padding:2px 4px 6px}
+.lane header b{font-family:var(--f-display);font-weight:600;font-size:14px;display:flex;gap:6px;align-items:center}
+.lane header .step{font-size:11px;color:var(--accent);font-weight:600}
+.lane header small{color:var(--muted);font-size:11px}
+.lane header .tot{font-size:12px;color:var(--fg);font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;cursor:grab}
+.card.over{border-inline-start:3px solid var(--bad)}
+.card .nm{font-weight:500;font-size:13px;line-height:1.4}
+.card .row{display:flex;justify-content:space-between;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.card .amt{font-variant-numeric:tabular-nums;color:var(--fg);font-weight:600}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:min(560px,100%);background:var(--surface);z-index:41;box-shadow:var(--shadow);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.drawer .hd{display:flex;align-items:flex-start;gap:10px;padding:16px;border-bottom:1px solid var(--line)}
+.drawer .hd h3{font-family:var(--f-display);margin:0;font-size:17px;font-weight:600;flex:1;text-wrap:balance}
+.drawer .bd{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+.drawer .ft{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form .full{grid-column:1/-1}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.form input,.form select,.form textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;font-size:14px;width:100%}
+.form textarea{min-height:70px;resize:vertical}
+@media (max-width:520px){.form{grid-template-columns:1fr}}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+.dl dt{color:var(--muted)} .dl dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.tl{display:flex;flex-direction:column;gap:0;border-inline-start:2px solid var(--line);margin-inline-start:6px}
+.tl .ev{position:relative;padding:0 16px 14px}
+.tl .ev::before{content:"";position:absolute;inset-inline-start:-7px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+.tl .ev small{color:var(--muted);display:block;font-size:12px}
+.steps{display:flex;gap:4px;flex-wrap:wrap}
+.steps span{font-size:11px;padding:3px 8px;border-radius:5px;background:var(--surface-2);color:var(--muted)}
+.steps span.done{background:var(--accent-soft);color:var(--accent)}
+.steps span.cur{background:var(--accent);color:var(--accent-ink)}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));right:50%;transform:translateX(50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:8px;z-index:60;font-size:13px}
+.confirm{background:var(--bad-soft);color:var(--bad);border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+h4{margin:0 0 8px;font-size:13px;font-family:var(--f-display);font-weight:600}
+.copy{cursor:pointer;border-bottom:1px dashed var(--muted)}
+/* auth + read-only */
+.auth{position:fixed;inset:0;z-index:80;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px 16px;overflow-y:auto}
+.auth .box{width:min(400px,100%);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.auth .logo{width:52px;height:52px;border-radius:12px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:22px}
+.auth h2{font-family:var(--f-display);margin:0;font-size:21px}
+.auth p{margin:0;color:var(--muted);font-size:13px}
+.auth label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.auth input{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:10px 12px;font-size:15px;width:100%}
+.auth .btn.pri{padding:10px;font-size:15px}
+.auth .links{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px}
+.auth .links a{cursor:pointer;color:var(--accent);text-decoration:none}
+.auth .msg{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
+.auth .msg.err{background:var(--bad-soft);color:var(--bad)} .auth .msg.ok{background:var(--ok-soft);color:var(--ok)}
+.who{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.ro #btnNewDue,.ro #btnNewTenant,.ro [data-pay],.ro [data-stg],.ro [data-issue],.ro #dPay,.ro #dStg,.ro #dEdit,.ro #dDel,.ro #dBill,.ro #tIssue,.ro #tEdit,.ro #tDue,.ro #tDel{display:none!important}
+@media (prefers-reduced-motion:no-preference){.drawer{animation:sl .18s ease-out}@keyframes sl{from{transform:translateX(-30px);opacity:.6}}}
+</style>
+
+<div dir="rtl" lang="ar">
+<header class="top">
+  <div class="wrap">
+    <div class="bar">
+      <div class="brand"><h1>إيجارات كرم مول</h1><span id="today"></span></div>
+      <div class="sync"><span class="dot" id="dot"></span><span id="syncTxt">جارٍ الاتصال…</span></div>
+      <span class="who" id="whoBox" hidden><span id="whoTxt"></span><button class="btn sm ghost" id="btnLogout">خروج</button></span>
+      <button class="btn" id="btnShare" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-inline-end:4px"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M17 8v6M14 11h6"/></svg>المستخدمون</button>
+      <button class="btn" id="btnExport" hidden>تصدير Excel</button>
+      <button class="btn" id="btnNewDue">+ مطالبة</button>
+      <button class="btn pri" id="btnNewTenant">+ عقد / مستأجر</button>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-v="dash" aria-selected="true">لوحة المتابعة</button>
+      <button role="tab" data-v="dues">المطالبات والدفعات<span class="cnt" id="c-dues">0</span></button>
+      <button role="tab" data-v="board">مراحل التحصيل</button>
+      <button role="tab" data-v="upcoming">الدفعات القادمة<span class="cnt" id="c-up">0</span></button>
+      <button role="tab" data-v="tenants">العقود والمستأجرون<span class="cnt" id="c-ten">0</span></button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="notice" id="noDb" hidden>تعذّر الاتصال بقاعدة البيانات. تحقق من الإنترنت وأعد تحميل الصفحة.</div>
+
+  <section class="view" id="v-dash">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="panel"><h2>يحتاج إجراء الآن<span class="sub" id="todoCount"></span></h2><div class="todo" id="todo"></div></div>
+      <div class="panel"><h2>المبالغ المفتوحة حسب مرحلة التحصيل<span class="sub">المتبقي بالريال</span></h2><div id="stageBars"></div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h2>أعمار الديون<span class="sub">من تاريخ الاستحقاق</span></h2><div id="aging"></div></div>
+      <div class="panel"><h2>التحصيل المتوقع — 6 أشهر<span class="sub">حسب جداول الدفعات في العقود</span></h2><div class="cols" id="fcCols"></div><div class="colx" id="fcX"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-dues" hidden>
+    <div class="toolbar">
+      <div class="chips" id="dueChips"></div>
+      <select id="dueStage" aria-label="المرحلة"></select>
+      <select id="dueBill" aria-label="حالة الفوترة"><option value="">كل حالات الفوترة</option><option value="none">غير مفوترة</option><option value="inv">مفوترة</option><option value="sent">أُرسلت للعميل</option></select>
+      <input type="search" id="dueQ" placeholder="بحث باسم المستأجر أو الملاحظة">
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>المستأجر</th><th>الفترة</th><th>الاستحقاق</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>الفوترة</th><th>المرحلة</th><th>آخر ملاحظة</th><th></th></tr></thead>
+      <tbody id="dueRows"></tbody><tfoot id="dueFoot"></tfoot>
+    </table></div>
+  </section>
+
+  <section class="view" id="v-board" hidden>
+    <div class="legend"><span>دورة التحصيل حسب السياسة: شهرين ونصف تقريباً. اسحب البطاقة إلى المرحلة الجديدة أو افتحها لتسجيل الإجراء.</span><span><b style="color:var(--bad)">▌</b> تجاوز المدة المحددة للمرحلة</span></div>
+    <div class="board" id="board"></div>
+  </section>
+
+  <section class="view" id="v-upcoming" hidden>
+    <div class="toolbar">
+      <div class="chips" id="upChips"></div>
+      <span class="legend" style="margin-inline-start:auto">«إصدار مطالبة» ينشئ سجل الدفعة ويحرّك الاستحقاق القادم في العقد للدورة التالية.</span>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>المستأجر</th><th>تاريخ الاستحقاق</th><th>المبلغ</th><th>الدورية</th><th>المتبقي للاستحقاق</th><th>نهاية العقد</th><th>التواصل</th><th></th></tr></thead>
+      <tbody id="upRows"></tbody><tfoot id="upFoot"></tfoot>
+    </table></div>
+  </section>
+
+  <section class="view" id="v-tenants" hidden>
+    <div class="toolbar">
+      <div class="chips" id="tenChips"></div>
+      <input type="search" id="tenQ" placeholder="بحث بالاسم أو المسؤول أو الجوال">
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>#</th><th>المستأجر</th><th>الإيجار السنوي</th><th>قيمة الدفعة</th><th>الاستحقاق القادم</th><th>بداية العقد</th><th>نهاية العقد</th><th>حالة العقد</th><th>رصيد مفتوح</th></tr></thead>
+      <tbody id="tenRows"></tbody><tfoot id="tenFoot"></tfoot>
+    </table></div>
+  </section>
+</main>
+<div id="layer"></div>
+<div class="auth" id="auth" hidden><form class="box" id="authForm" novalidate>
+  <div class="logo">ك</div>
+  <div><h2 id="aTitle">تسجيل الدخول</h2><p id="aSub">نظام متابعة عقود وتحصيل إيجارات كرم مول</p></div>
+  <div class="msg" id="aMsg" hidden></div>
+  <label id="aMailL">البريد الإلكتروني<input id="aMail" type="email" autocomplete="email" dir="ltr" required></label>
+  <label id="aPassL">كلمة المرور<input id="aPass" type="password" autocomplete="current-password" dir="ltr" minlength="6"></label>
+  <button class="btn pri" id="aBtn" type="submit">دخول</button>
+  <div class="links"><a id="aForgot">نسيت كلمة المرور؟</a><a id="aSwitch">أول مرة؟ أنشئ كلمة مرور</a></div>
+</form></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+const STAGES=[
+ {k:'المطالبة',d:30,desc:'شهر التواصل والزيارات الأولية'},
+ {k:'التشغيل',d:7,desc:'أسبوع — منع دخول البضاعة'},
+ {k:'التاجير',d:7,desc:'أسبوع — إدارة التأجير'},
+ {k:'زيارات طارئة',d:7,desc:'أسبوع'},
+ {k:'المحصل القانوني',d:14,desc:'أسبوعين'},
+ {k:'خطاب قانوني',d:7,desc:'5 أيام عمل'},
+ {k:'التنفيذ',d:null,desc:'رفع طلب التنفيذ'},
+ {k:'رفع قضية بالاخلاء',d:null,desc:'قضية إخلاء'},
+ {k:'في مرحلة التحويل',d:7,desc:'العميل أكد التحويل — بانتظار وصول المبلغ'}
+];
+const STAGE_KEYS=STAGES.map(s=>s.k);
+const ST={paid:['مدفوعة','p-paid'],partial:['مدفوعة جزئياً','p-due'],due:['مستحقة','p-due'],late:['متأخرة','p-late'],up:['قادمة','p-up']};
+const BILL={none:['غير مفوترة','p-mute'],inv:['مفوترة','p-up'],sent:['أُرسلت للعميل','p-acc']};
+const billOf=d=>d.billing||'inv';
+const bPill=d=>{const [l,c]=BILL[billOf(d)];return `<span class="pill ${c}">${l}</span>`};
+const STATE={active:'ساري',pending:'قيد التوثيق',ended:'منتهي',evicted:'تم الإخلاء'};
+
+let who={owner:null,edit:null,write:null};
+function showRO(){if(sb){toast('لا تملك صلاحية التعديل — صلاحيتك: مشاهد');return}const n=$('#noDb');n.hidden=false;n.innerHTML='هذا العرض لا يسمح بالحفظ (صلاحيتك هنا: '+(who.owner?'مالك':who.edit?'محرر':who.write?'مساهم':'عرض فقط')+'). افتح رابط الصفحة كاملاً في المتصفح وأنت مسجّل بنفس حساب claude.ai المالك للصفحة، أو اطلب من المالك مشاركتها معك بصلاحية Contributor.';toast('لم يتم الحفظ — هذا العرض للقراءة فقط')}
+let db=null, canWrite=null, tenants=[], dues=[], ready={t:false,d:false};
+const ui={view:'dash',dueF:'open',dueStage:'',dueBill:'',dueQ:'',upW:30,tenF:'all',tenQ:''};
+try{const s=JSON.parse(localStorage.getItem('krc-ui')||'{}');Object.assign(ui,s)}catch(e){}
+const saveUi=()=>{try{localStorage.setItem('krc-ui',JSON.stringify(ui))}catch(e){}};
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>(Math.round((+n||0)*100)/100).toLocaleString('en-US',{maximumFractionDigits:2});
+const fmtK=n=>{n=+n||0;return Math.abs(n)>=1e6?(n/1e6).toFixed(2)+' م':Math.abs(n)>=1e3?Math.round(n/1e3)+' ألف':fmt(n)};
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const TODAY=iso(new Date());
+const parse=s=>{if(!s)return null;const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const days=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
+const addM=(s,m)=>{const d=parse(s);const day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+m);const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));return iso(d)};
+const fd=s=>{if(!s)return '—';const [y,m,d]=s.split('-');return d+'/'+m+'/'+y};
+const MONTHS=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+$('#today').textContent='اليوم '+fd(TODAY)+' — متابعة العقود والتحصيل';
+
+const tById=id=>tenants.find(t=>t.id===id);
+const paidOf=d=>(d.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
+const remOf=d=>Math.max(0,(+d.amount||0)-paidOf(d));
+function dueStatus(d){
+  const paid=paidOf(d);
+  if(d.closed||remOf(d)<=0.5) return 'paid';
+  if(d.dueDate>TODAY) return 'up';
+  if(days(d.dueDate,TODAY)>30) return 'late';
+  return paid>0?'partial':'due';
+}
+const stageInfo=k=>STAGES.find(s=>s.k===k);
+function stageAge(d){return d.stageDate?days(d.stageDate,TODAY):0}
+function stageOver(d){const s=stageInfo(d.stage);return s&&s.d!=null&&stageAge(d)>s.d}
+function contractState(t){
+  if(t.state==='evicted'||t.state==='pending') return t.state;
+  if(t.end&&t.end<TODAY) return 'ended';
+  return 'active';
+}
+const isNew=t=>t.start&&(t.start>TODAY||days(t.start,TODAY)<=90);
+const expSoon=t=>contractState(t)==='active'&&t.end&&t.end>=TODAY&&days(TODAY,t.end)<=90;
+function tenantOpen(id){return dues.filter(d=>d.tenantId===id&&!d.closed&&dueStatus(d)!=='paid').reduce((a,d)=>a+remOf(d),0)}
+function pill(k){const [l,c]=ST[k];return `<span class="pill ${c}">${l}</span>`}
+function cPill(t){const s=contractState(t);let h='';
+  if(s==='active') h=expSoon(t)?'<span class="pill p-due">ينتهي خلال '+days(TODAY,t.end)+' يوم</span>':'<span class="pill p-paid">ساري</span>';
+  else if(s==='ended') h='<span class="pill p-late">منتهي</span>';
+  else if(s==='pending') h='<span class="pill p-up">قيد التوثيق</span>';
+  else h='<span class="pill p-mute">تم الإخلاء</span>';
+  if(isNew(t)&&s!=='evicted') h+=' <span class="pill p-acc">جديد</span>';
+  return h}
+function toast(m){const e=document.createElement('div');e.className='toast';e.textContent=m;document.body.appendChild(e);setTimeout(()=>e.remove(),2400)}
+
+/* ---------- data ---------- */
+async function put(col,obj){
+  if(!db){toast('قاعدة البيانات غير متاحة في هذا العرض');return false}
+  const {id,...raw}=obj;
+  const rest=JSON.parse(JSON.stringify(raw,(k,v)=>v===null||v===undefined||(typeof v==='number'&&!isFinite(v))?'':v));
+  try{await db.collection(col).doc(id).set(rest);const arr=col==='dues'?dues:tenants;const i=arr.findIndex(x=>x.id===id);if(i>=0)arr[i]=obj;else arr.push(obj);render();return true}
+  catch(e){
+    if(e&&e.code==='unavailable'){try{await new Promise(r=>setTimeout(r,600+Math.random()*600));await db.collection(col).doc(id).set(rest);const arr=col==='dues'?dues:tenants;const i=arr.findIndex(x=>x.id===id);if(i>=0)arr[i]=obj;else arr.push(obj);render();return true}catch(e2){e=e2}}
+    console.error('db write failed',col,id,e);
+    if(e&&e.code==='invalid_argument'){showRO();return false}
+    toast('تعذّر الحفظ ('+((e&&e.code)||'خطأ')+(e&&e.message?' — '+e.message:'')+')');return false}
+}
+async function del(col,id){if(!db)return;try{await db.collection(col).doc(id).delete();if(col==='dues')dues=dues.filter(x=>x.id!==id);else tenants=tenants.filter(x=>x.id!==id);render()}catch(e){toast('تعذّر الحذف')}}
+
+async function boot(){
+  render();
+  if(window.SB_CFG&&window.supabase){bootSupabase();return}
+  const c=window.claude;
+  db=c&&c.use?await c.use('db'):null;
+  if(!db){$('#noDb').hidden=false;$('#syncTxt').textContent='غير متصل';return}
+  $('#dot').classList.add('on');$('#syncTxt').textContent='متصل';
+  try{const u=await c.use('user');if(u){canWrite=await u.can('data.write');who={owner:await u.isOwner(),edit:await u.canEdit(),write:canWrite};if(canWrite===false){$('#syncTxt').textContent='عرض فقط';$('#noDb').hidden=false;$('#noDb').textContent='لديك صلاحية عرض فقط. لطلب صلاحية التعديل اطلب من مالك الصفحة مشاركتها معك بصلاحية Contributor أو Editor.'}}}catch(e){}
+  db.collection('tenants').onSnapshot(s=>{tenants=s.docs.map(d=>({id:d.id,...d.data()}));ready.t=true;render()},e=>{$('#syncTxt').textContent='انقطع الاتصال'});
+  db.collection('dues').onSnapshot(s=>{dues=s.docs.map(d=>({id:d.id,...d.data()}));ready.d=true;render()},e=>{$('#syncTxt').textContent='انقطع الاتصال'});
+  const dl=c.use?await c.use('downloads'):null;
+  if(dl&&window.XLSX){const b=$('#btnExport');b.hidden=false;b.onclick=()=>exportXlsx(dl)}
+}
+
+/* ---------- Supabase backend ---------- */
+let sb=null, MY_ROLE=null, MY_EMAIL='', started=false;
+const ROLES={admin:['مدير','p-acc'],editor:['محرر','p-paid'],viewer:['مشاهد','p-up']};
+let authMode='login';
+function authMsg(t,k){const m=$('#aMsg');m.hidden=!t;m.textContent=t||'';m.className='msg'+(k?' '+k:'')}
+function showAuth(mode,msg,kind){
+  authMode=mode;const a=$('#auth');a.hidden=false;
+  const T={login:['تسجيل الدخول','دخول','أول مرة؟ أنشئ كلمة مرور'],signup:['إنشاء كلمة مرور','إنشاء الحساب','لديك حساب؟ سجّل الدخول'],forgot:['استعادة كلمة المرور','إرسال رابط الاستعادة','رجوع لتسجيل الدخول'],reset:['كلمة مرور جديدة','حفظ كلمة المرور','']}[mode];
+  $('#aTitle').textContent=T[0];$('#aBtn').textContent=T[1];$('#aSwitch').textContent=T[2];
+  $('#aSub').textContent=mode==='signup'?'استخدم البريد الذي أضافه مدير النظام لك.':mode==='forgot'?'نرسل لك رابطاً على بريدك لتعيين كلمة مرور جديدة.':mode==='reset'?'اكتب كلمة المرور الجديدة (6 أحرف على الأقل).':'نظام متابعة عقود وتحصيل إيجارات كرم مول';
+  $('#aMailL').hidden=mode==='reset';$('#aPassL').hidden=mode==='forgot';
+  $('#aPass').autocomplete=mode==='login'?'current-password':'new-password';
+  $('#aForgot').hidden=mode!=='login';$('#aSwitch').hidden=mode==='reset';
+  authMsg(msg||'',kind);
+}
+function hideAuth(){$('#auth').hidden=true}
+async function bootSupabase(){
+  sb=supabase.createClient(SB_CFG.url,SB_CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  $('#syncTxt').textContent='جارٍ التحقق…';
+  $('#aSwitch').onclick=()=>showAuth(authMode==='login'?'signup':'login');
+  $('#aForgot').onclick=()=>showAuth('forgot');
+  $('#authForm').onsubmit=async e=>{e.preventDefault();const btn=$('#aBtn');const em=val('aMail').toLowerCase(),pw=$('#aPass').value;
+    if(authMode!=='reset'&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){authMsg('اكتب بريداً إلكترونياً صحيحاً','err');return}
+    if(authMode!=='forgot'&&pw.length<6){authMsg('كلمة المرور 6 أحرف على الأقل','err');return}
+    btn.disabled=true;authMsg('');
+    try{
+      const here=location.origin+location.pathname;
+      if(authMode==='login'){const {error}=await sb.auth.signInWithPassword({email:em,password:pw});if(error)throw error}
+      else if(authMode==='signup'){const {data,error}=await sb.auth.signUp({email:em,password:pw,options:{emailRedirectTo:here}});if(error)throw error;
+        if(!data.session)showAuth('login','تم إنشاء الحساب. افتح رسالة التأكيد في بريدك ثم سجّل الدخول.','ok')}
+      else if(authMode==='forgot'){const {error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:here});if(error)throw error;authMsg('أرسلنا رابط الاستعادة إلى بريدك.','ok')}
+      else if(authMode==='reset'){const {error}=await sb.auth.updateUser({password:pw});if(error)throw error;authMode='login';hideAuth();toast('تم تغيير كلمة المرور');const {data:{session}}=await sb.auth.getSession();if(session)startSession(session)}
+    }catch(err){const m=String(err&&err.message||err);
+      authMsg(/Invalid login/i.test(m)?'البريد أو كلمة المرور غير صحيحة':/not confirmed/i.test(m)?'لم يتم تأكيد البريد بعد — افتح رسالة التأكيد في بريدك':/already registered/i.test(m)?'هذا البريد لديه حساب — سجّل الدخول أو استخدم «نسيت كلمة المرور»':/rate limit/i.test(m)?'محاولات كثيرة — انتظر قليلاً ثم حاول':m,'err')}
+    btn.disabled=false};
+  $('#btnLogout').onclick=async()=>{await sb.auth.signOut();location.reload()};
+  sb.auth.onAuthStateChange((ev,session)=>{
+    if(ev==='PASSWORD_RECOVERY'){showAuth('reset');return}
+    if(ev==='SIGNED_OUT'){started=false;showAuth('login');return}
+    if(session&&authMode!=='reset')setTimeout(()=>startSession(session),0)});
+  const {data:{session}}=await sb.auth.getSession();
+  if(session&&!/type=recovery/.test(location.hash))startSession(session);else if(!session)showAuth('login');
+}
+async function startSession(session){
+  if(started)return;started=true;hideAuth();
+  MY_EMAIL=(session.user.email||'').toLowerCase();
+  const {data:u}=await sb.from('app_users').select('role').eq('email',MY_EMAIL).maybeSingle();
+  MY_ROLE=u?u.role:null;
+  $('#whoBox').hidden=false;$('#whoTxt').textContent=MY_EMAIL+(MY_ROLE?' · '+ROLES[MY_ROLE][0]:'');
+  if(!MY_ROLE){const n=$('#noDb');n.hidden=false;n.textContent='حسابك ('+MY_EMAIL+') غير مضاف للنظام. اطلب من مدير النظام إضافة بريدك من شاشة «المستخدمون» ثم أعد تحميل الصفحة.';$('#syncTxt').textContent='بدون صلاحية';$('#btnNewDue').hidden=true;$('#btnNewTenant').hidden=true;return}
+  canWrite=MY_ROLE!=='viewer';who={owner:MY_ROLE==='admin',edit:canWrite,write:canWrite};
+  document.documentElement.classList.toggle('ro',!canWrite);
+  if(MY_ROLE==='admin'){const b=$('#btnShare');b.hidden=false;b.onclick=openUsers}
+  db={collection:col=>({onSnapshot:()=>()=>{},doc:id=>({
+    set:async d=>{const {error}=await sb.from(col).upsert({id,data:d});if(error)throw{code:error.code==='42501'||/row-level security/i.test(error.message)?'invalid_argument':'server',message:error.message}},
+    delete:async()=>{const {error}=await sb.from(col).delete().eq('id',id);if(error)throw{code:'server',message:error.message}}})})};
+  await loadAll(true);
+  let t;const again=()=>{clearTimeout(t);t=setTimeout(()=>loadAll(false),400)};
+  sb.channel('rent-db').on('postgres_changes',{event:'*',schema:'public',table:'tenants'},again).on('postgres_changes',{event:'*',schema:'public',table:'dues'},again).subscribe();
+  setInterval(()=>{if(!document.hidden)loadAll(false)},120000);
+  if(window.XLSX){const b=$('#btnExport');b.hidden=false;b.onclick=()=>exportXlsx(null)}
+}
+async function fetchAll(t){let out=[],from=0;for(;;){const {data,error}=await sb.from(t).select('id,data').range(from,from+999);if(error)throw error;out=out.concat(data.map(r=>({...r.data,id:r.id})));if(data.length<1000)break;from+=1000}return out}
+async function loadAll(first){
+  try{const [a,b]=await Promise.all([fetchAll('tenants'),fetchAll('dues')]);tenants=a;dues=b;ready.t=ready.d=true;
+    $('#dot').classList.add('on');$('#syncTxt').textContent='متصل — '+new Date().toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});render()}
+  catch(e){$('#dot').classList.remove('on');$('#syncTxt').textContent='تعذّر الاتصال';if(first)toast('تعذّر تحميل البيانات: '+(e.message||e))}
+}
+function openUsers(){
+  drawer('المستخدمون والصلاحيات',`<div class="legend" style="display:block;line-height:1.8"><b>مدير</b>: يعدّل ويدير المستخدمين · <b>محرر</b>: يضيف ويعدّل المطالبات والعقود · <b>مشاهد</b>: عرض فقط.</div>
+    <div class="form"><label class="full">البريد الإلكتروني<input id="uMail" type="email" inputmode="email" placeholder="name@company.com" dir="ltr"></label>
+    <label>الصلاحية<select id="uRole"><option value="editor">محرر</option><option value="viewer">مشاهد</option><option value="admin">مدير</option></select></label>
+    <label style="justify-content:flex-end"><button class="btn pri" id="uAdd" type="button">إضافة مستخدم</button></label></div>
+    <div><h4>المستخدمون</h4><div id="uList"><div class="empty">جارٍ التحميل…</div></div></div>
+    <div class="legend" style="display:block;line-height:1.8">بعد الإضافة أرسل للمستخدم رابط النظام. أول مرة يضغط «أول مرة؟ أنشئ كلمة مرور» ويستخدم نفس البريد.</div>`,
+    `<button class="btn" id="uCopy">نسخ رابط النظام</button>`);
+  const paint=async()=>{const {data,error}=await sb.from('app_users').select('email,role').order('created_at');
+    if(error){$('#uList').innerHTML='<div class="empty">'+esc(error.message)+'</div>';return}
+    $('#uList').innerHTML=`<div class="tbl"><table><tbody>${data.map(u=>`<tr style="cursor:default"><td dir="ltr" style="text-align:start">${esc(u.email)}</td><td>${u.email===MY_EMAIL?`<span class="pill ${ROLES[u.role][1]}">${ROLES[u.role][0]} (أنت)</span>`:`<select data-role="${esc(u.email)}">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${k===u.role?'selected':''}>${v[0]}</option>`).join('')}</select>`}</td><td class="n">${u.email===MY_EMAIL?'':`<button class="btn sm danger" data-rm="${esc(u.email)}">إزالة</button>`}</td></tr>`).join('')}</tbody></table></div>`;
+    document.querySelectorAll('[data-role]').forEach(s=>s.onchange=async()=>{const {error}=await sb.from('app_users').update({role:s.value}).eq('email',s.dataset.role);toast(error?error.message:'تم تحديث الصلاحية')});
+    document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{b.disabled=true;const {error}=await sb.from('app_users').delete().eq('email',b.dataset.rm);toast(error?error.message:'تمت الإزالة');paint()})};
+  paint();
+  $('#uAdd').onclick=async()=>{const m=val('uMail').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m)){toast('أدخل بريداً صحيحاً');return}
+    const {error}=await sb.from('app_users').upsert({email:m,role:val('uRole')});if(error){toast(error.message);return}$('#uMail').value='';toast('تمت إضافة '+m);paint()};
+  $('#uCopy').onclick=()=>{const u=location.origin+location.pathname;Promise.resolve().then(()=>navigator.clipboard.writeText(u)).then(()=>toast('تم نسخ الرابط'),()=>toast(u))};
+}
+
+/* ---------- render ---------- */
+function render(){
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===ui.view));
+  document.querySelectorAll('section.view').forEach(s=>s.hidden=s.id!=='v-'+ui.view);
+  const open=dues.filter(d=>{const s=dueStatus(d);return s!=='paid'&&s!=='up'});
+  $('#c-dues').textContent=open.length;
+  $('#c-up').textContent=upcomingList(30).length;
+  $('#c-ten').textContent=tenants.filter(t=>contractState(t)!=='evicted').length;
+  ({dash:rDash,dues:rDues,board:rBoard,upcoming:rUp,tenants:rTen})[ui.view]();
+}
+function emptyMsg(){return db&&ready.t&&ready.d?'لا توجد بيانات بعد — ابدأ بإضافة عقد أو مطالبة.':db?'جارٍ تحميل البيانات…':'جارٍ الاتصال…'}
+
+function upcomingList(w){
+  const lim=iso(new Date(parse(TODAY).getTime()+w*864e5));
+  return tenants.filter(t=>contractState(t)!=='evicted'&&t.nextDue&&+t.installment>0&&t.nextDue<=lim&&!(t.end&&t.nextDue>t.end)).sort((a,b)=>a.nextDue.localeCompare(b.nextDue));
+}
+
+function rDash(){
+  const open=dues.filter(d=>{const s=dueStatus(d);return s!=='paid'&&s!=='up'});
+  const late=open.filter(d=>dueStatus(d)==='late');
+  const up30=upcomingList(30); const upAmt=up30.reduce((a,t)=>a+(+t.installment||0),0);
+  const exp=tenants.filter(expSoon); const nw=tenants.filter(t=>isNew(t)&&contractState(t)!=='evicted');
+  const sum=a=>a.reduce((x,d)=>x+remOf(d),0);
+  const unb=dues.filter(d=>billOf(d)==='none'&&dueStatus(d)!=='paid');
+  $('#kpis').innerHTML=[
+    ['warn','إجمالي المستحق غير المحصّل',fmt(sum(open)),open.length+' مطالبة مفتوحة','dues','open'],
+    ['bad','متأخر أكثر من 30 يوم',fmt(sum(late)),late.length+' مطالبة','dues','late'],
+    ['info','دفعات قادمة خلال 30 يوم',fmt(upAmt),up30.length+' دفعة حسب العقود','upcoming',30],
+    ['','مطالبات غير مفوترة',fmt(unb.reduce((a,d)=>a+remOf(d),0)),unb.length+' مطالبة بانتظار إصدار الفاتورة','dues','unbilled'],
+    ['','عقود تنتهي خلال 90 يوم',exp.length,'و '+nw.length+' عقد جديد آخر 90 يوم','tenants','exp']
+  ].map(k=>`<button class="kpi ${k[0]}" data-go="${k[4]}" data-f="${k[5]}"><small>${k[1]}</small><b>${k[2]}</b><i>${k[3]}</i></button>`).join('');
+  document.querySelectorAll('#kpis .kpi').forEach(b=>b.onclick=()=>{const v=b.dataset.go,f=b.dataset.f;if(v==='dues'){if(f==='unbilled'){ui.dueF='all';ui.dueBill='none'}else{ui.dueF=f;ui.dueBill=''}}if(v==='upcoming')ui.upW=+f;if(v==='tenants')ui.tenF=f;go(v)});
+
+  // todo
+  const items=[];
+  open.filter(stageOver).forEach(d=>items.push({w:3,h:`<span class="pill p-late">تجاوز المرحلة</span>`,t:d.tenantName,s:`${d.stage} منذ ${stageAge(d)} يوم (المحدد ${stageInfo(d.stage).d}) — متبقي ${fmt(remOf(d))}`,a:()=>openDue(d.id)}));
+  unb.filter(d=>days(TODAY,d.dueDate)<=7).forEach(d=>items.push({w:2,h:'<span class="pill p-mute">غير مفوترة</span>',t:d.tenantName,s:`${d.period||''} — ${fmt(remOf(d))} تستحق ${fd(d.dueDate)} ولم تصدر فاتورتها`,a:()=>openDue(d.id)}));
+  upcomingList(7).forEach(t=>items.push({w:t.nextDue<TODAY?2:1,h:t.nextDue<TODAY?'<span class="pill p-due">لم تُصدر</span>':'<span class="pill p-up">هذا الأسبوع</span>',t:t.name,s:`دفعة ${fmt(t.installment)} تستحق ${fd(t.nextDue)}`,a:()=>openTenant(t.id)}));
+  tenants.filter(t=>expSoon(t)&&days(TODAY,t.end)<=30).forEach(t=>items.push({w:1,h:'<span class="pill p-due">تجديد</span>',t:t.name,s:'العقد ينتهي '+fd(t.end),a:()=>openTenant(t.id)}));
+  tenants.filter(t=>t.state==='pending').forEach(t=>items.push({w:0,h:'<span class="pill p-up">توثيق</span>',t:t.name,s:'عقد قيد التوثيق',a:()=>openTenant(t.id)}));
+  items.sort((a,b)=>b.w-a.w);
+  $('#todoCount').textContent=items.length?items.length+' بند':'';
+  const td=$('#todo');td.innerHTML=items.length?'':`<div class="empty">${dues.length||tenants.length?'لا توجد إجراءات عاجلة.':emptyMsg()}</div>`;
+  items.slice(0,12).forEach(i=>{const e=document.createElement('div');e.className='it';e.innerHTML=`${i.h}<div class="t"><b>${esc(i.t)}</b><small>${esc(i.s)}</small></div>`;e.onclick=i.a;td.appendChild(e)});
+
+  // stage bars
+  const byS=STAGE_KEYS.map(k=>({k,v:open.filter(d=>d.stage===k).reduce((a,d)=>a+remOf(d),0),n:open.filter(d=>d.stage===k).length}));
+  const mx=Math.max(1,...byS.map(x=>x.v));
+  $('#stageBars').innerHTML=byS.map(x=>`<div class="hbar"><span>${esc(x.k)}</span><div class="track"><div class="fill" style="width:${x.v/mx*100}%"></div></div><span class="v">${fmt(x.v)} · ${x.n}</span></div>`).join('');
+
+  // aging
+  const buckets=[['0–30 يوم',0,30,'var(--warn)'],['31–90 يوم',31,90,'var(--warn)'],['91–180 يوم',91,180,'var(--bad)'],['أكثر من 180 يوم',181,1e9,'var(--bad)']].map(b=>{const l=open.filter(d=>{const a=days(d.dueDate,TODAY);return a>=b[1]&&a<=b[2]});return {l:b[0],c:b[3],v:sum(l),n:l.length}});
+  const mx2=Math.max(1,...buckets.map(b=>b.v));
+  $('#aging').innerHTML=buckets.map(b=>`<div class="hbar"><span>${b.l}</span><div class="track"><div class="fill" style="width:${b.v/mx2*100}%;background:${b.c}"></div></div><span class="v">${fmt(b.v)} · ${b.n}</span></div>`).join('');
+
+  // forecast 6 months from schedules
+  const now=parse(TODAY);const ms=[];for(let i=0;i<6;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1);ms.push({y:d.getFullYear(),m:d.getMonth(),v:0})}
+  const endLim=iso(new Date(now.getFullYear(),now.getMonth()+6,1));
+  tenants.forEach(t=>{if(contractState(t)==='evicted'||!t.nextDue||!(+t.installment))return;let d=t.nextDue<TODAY?TODAY:t.nextDue;let nd=t.nextDue;let guard=0;
+    while(nd<endLim&&guard++<40){if(t.end&&nd>t.end)break;const dd=nd<TODAY?TODAY:nd;const p=parse(dd);const b=ms.find(x=>x.y===p.getFullYear()&&x.m===p.getMonth());if(b)b.v+=+t.installment;nd=addM(nd,+t.everyMonths||12)}});
+  const mx3=Math.max(1,...ms.map(x=>x.v));
+  $('#fcCols').innerHTML=ms.map(x=>`<div class="c"><span>${fmtK(x.v)}</span><div class="b" style="height:${x.v/mx3*120}px"></div></div>`).join('');
+  $('#fcX').innerHTML=ms.map(x=>`<span>${MONTHS[x.m]}</span>`).join('');
+}
+
+function dueRowsFiltered(){
+  const q=ui.dueQ.trim();
+  return dues.filter(d=>{const s=dueStatus(d);
+    if(ui.dueF==='open'&&(s==='paid'||s==='up'))return false;
+    if(ui.dueF==='late'&&s!=='late')return false;
+    if(ui.dueF==='due'&&!(s==='due'||s==='partial'))return false;
+    if(ui.dueF==='up'&&s!=='up')return false;
+    if(ui.dueF==='paid'&&s!=='paid')return false;
+    if(ui.dueStage&&d.stage!==ui.dueStage)return false;
+    if(ui.dueBill&&billOf(d)!==ui.dueBill)return false;
+    if(q&&!(d.tenantName||'').includes(q)&&!(d.notes||'').includes(q))return false;
+    return true}).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+}
+function rDues(){
+  const F=[['open','المفتوحة'],['late','متأخرة'],['due','مستحقة'],['up','قادمة'],['paid','مدفوعة'],['all','الكل']];
+  $('#dueChips').innerHTML=F.map(f=>`<button class="chip" aria-pressed="${ui.dueF===f[0]}" data-f="${f[0]}">${f[1]}</button>`).join('');
+  document.querySelectorAll('#dueChips .chip').forEach(c=>c.onclick=()=>{ui.dueF=c.dataset.f;saveUi();render()});
+  const sel=$('#dueStage');if(!sel.options.length){sel.innerHTML='<option value="">كل المراحل</option>'+STAGE_KEYS.map(k=>`<option>${esc(k)}</option>`).join('');sel.onchange=()=>{ui.dueStage=sel.value;saveUi();render()}}
+  sel.value=ui.dueStage;
+  const bs=$('#dueBill');bs.value=ui.dueBill;bs.onchange=()=>{ui.dueBill=bs.value;saveUi();render()};
+  const qi=$('#dueQ');if(qi.value!==ui.dueQ&&document.activeElement!==qi)qi.value=ui.dueQ;
+  const rows=dueRowsFiltered();
+  $('#dueRows').innerHTML=rows.length?rows.map(d=>{const s=dueStatus(d);const si=stageInfo(d.stage);const ov=stageOver(d)&&s!=='paid'&&s!=='up';
+    return `<tr data-id="${d.id}"><td><span class="nm">${esc(d.tenantName)}</span></td><td class="n">${esc(d.period||'')}</td><td class="n">${fd(d.dueDate)}</td><td class="n">${fmt(d.amount)}</td><td class="n">${fmt(paidOf(d))}</td><td class="n"><b>${fmt(remOf(d))}</b></td><td>${pill(s)}</td><td>${bPill(d)}${d.invNo?'<span class="note num">'+esc(d.invNo)+'</span>':''}</td>
+    <td>${s==='paid'?'—':`<div>${esc(d.stage||'')}</div><div class="sla ${ov?'over':''}">${stageAge(d)} يوم${si&&si.d!=null?' / '+si.d:''}</div>`}</td><td><span class="note">${esc(lastNote(d))}</span></td>
+    <td class="n"><button class="btn sm" data-pay="${d.id}">دفعة</button> <button class="btn sm" data-stg="${d.id}">إجراء</button></td></tr>`}).join(''):`<tr><td colspan="11" class="empty">${dues.length?'لا توجد مطالبات بهذا التصفية.':emptyMsg()}</td></tr>`;
+  $('#dueFoot').innerHTML=rows.length?`<tr><td colspan="3">الإجمالي (${rows.length})</td><td class="n">${fmt(rows.reduce((a,d)=>a+(+d.amount||0),0))}</td><td class="n">${fmt(rows.reduce((a,d)=>a+paidOf(d),0))}</td><td class="n">${fmt(rows.reduce((a,d)=>a+remOf(d),0))}</td><td colspan="5"></td></tr>`:'';
+  document.querySelectorAll('#dueRows tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('button'))return;openDue(tr.dataset.id)});
+  document.querySelectorAll('#dueRows [data-pay]').forEach(b=>b.onclick=()=>openPay(b.dataset.pay));
+  document.querySelectorAll('#dueRows [data-stg]').forEach(b=>b.onclick=()=>openStage(b.dataset.stg));
+}
+function lastNote(d){const h=d.history||[];for(let i=h.length-1;i>=0;i--)if(h[i].note)return h[i].note;return d.notes||''}
+
+function rBoard(){
+  const open=dues.filter(d=>{const s=dueStatus(d);return s!=='paid'&&s!=='up'});
+  const b=$('#board');
+  b.innerHTML=STAGES.map((s,i)=>{const l=open.filter(d=>d.stage===s.k).sort((a,c)=>stageAge(c)-stageAge(a));
+    return `<div class="lane" data-stage="${esc(s.k)}"><header><span class="step">${i<8?'المرحلة '+(i+1):'بانتظار التحويل'}</span><b>${esc(s.k)}</b><small>${esc(s.desc)}</small><span class="tot">${fmt(l.reduce((a,d)=>a+remOf(d),0))} · ${l.length}</span></header>
+    ${l.map(d=>`<div class="card ${stageOver(d)?'over':''}" draggable="true" data-id="${d.id}"><div class="nm">${esc(d.tenantName)}</div><div class="row"><span>${esc(d.period||'')}</span><span class="amt">${fmt(remOf(d))}</span></div><div class="row">${billOf(d)==='none'?'<span class="pill p-mute">غير مفوترة</span>':''}<span class="sla ${stageOver(d)?'over':''}">في المرحلة ${stageAge(d)} يوم${s.d!=null?' من '+s.d:''}</span>${pill(dueStatus(d))}</div></div>`).join('')}</div>`}).join('');
+  if(!open.length&&!dues.length)b.insertAdjacentHTML('afterbegin',`<div class="empty" style="flex:0 0 100%">${emptyMsg()}</div>`);
+  b.querySelectorAll('.card').forEach(c=>{c.onclick=()=>openDue(c.dataset.id);c.ondragstart=e=>{e.dataTransfer.setData('text/plain',c.dataset.id)}});
+  b.querySelectorAll('.lane').forEach(l=>{l.ondragover=e=>{e.preventDefault();l.classList.add('drop')};l.ondragleave=()=>l.classList.remove('drop');
+    l.ondrop=e=>{e.preventDefault();l.classList.remove('drop');const id=e.dataTransfer.getData('text/plain');const d=dues.find(x=>x.id===id);if(d&&d.stage!==l.dataset.stage)openStage(id,l.dataset.stage)}});
+}
+
+function rUp(){
+  const W=[[7,'7 أيام'],[30,'30 يوم'],[60,'60 يوم'],[90,'90 يوم'],[180,'6 أشهر']];
+  $('#upChips').innerHTML=W.map(w=>`<button class="chip" aria-pressed="${ui.upW===w[0]}" data-w="${w[0]}">${w[1]}</button>`).join('');
+  document.querySelectorAll('#upChips .chip').forEach(c=>c.onclick=()=>{ui.upW=+c.dataset.w;saveUi();render()});
+  const l=upcomingList(ui.upW);
+  $('#upRows').innerHTML=l.length?l.map(t=>{const dd=days(TODAY,t.nextDue);return `<tr data-id="${t.id}"><td><span class="nm">${esc(t.name)}</span></td><td class="n">${fd(t.nextDue)}</td><td class="n"><b>${fmt(t.installment)}</b></td><td class="n">كل ${t.everyMonths||12} شهر</td>
+    <td>${dd<0?`<span class="pill p-late">فات ${-dd} يوم — لم تُصدر</span>`:dd===0?'<span class="pill p-due">اليوم</span>':`<span class="pill p-up">بعد ${dd} يوم</span>`}</td><td class="n">${fd(t.end)}</td><td class="n">${esc(t.contact||'')}${t.phone?'<br><small class="num">'+esc(t.phone)+'</small>':''}</td>
+    <td class="n"><button class="btn sm pri" data-issue="${t.id}">إصدار مطالبة</button></td></tr>`}).join(''):`<tr><td colspan="8" class="empty">${tenants.length?'لا توجد دفعات مجدولة في هذه الفترة.':emptyMsg()}</td></tr>`;
+  $('#upFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.installment||0),0))}</td><td colspan="5"></td></tr>`:'';
+  document.querySelectorAll('#upRows tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('button'))return;openTenant(tr.dataset.id)});
+  document.querySelectorAll('#upRows [data-issue]').forEach(b=>b.onclick=()=>issue(b.dataset.issue,b));
+}
+async function issue(tid,btn){
+  const t=tById(tid);if(!t)return;if(btn)btn.disabled=true;
+  const p=parse(t.nextDue);
+  const d={id:uid('d'),tenantId:t.id,tenantName:t.name,period:MONTHS[p.getMonth()]+' '+p.getFullYear(),amount:+t.installment,dueDate:t.nextDue,stage:'المطالبة',stageDate:TODAY,payments:[],notes:'',closed:false,billing:'none',invNo:'',invDate:'',history:[{date:TODAY,stage:'المطالبة',note:'إنشاء مطالبة الدفعة — بانتظار الفوترة'}]};
+  if(await put('dues',d)){const {id,...r}=t;await put('tenants',{...t,nextDue:addM(t.nextDue,+t.everyMonths||12)});toast('تم إنشاء المطالبة — سجّل رقم الفاتورة عند إصدارها')}
+  else if(btn)btn.disabled=false;
+}
+
+function rTen(){
+  const F=[['all','الكل'],['active','سارية'],['exp','تنتهي خلال 90 يوم'],['new','جديدة'],['pending','قيد التوثيق'],['ended','منتهية'],['evicted','تم الإخلاء'],['debt','عليها رصيد']];
+  $('#tenChips').innerHTML=F.map(f=>`<button class="chip" aria-pressed="${ui.tenF===f[0]}" data-f="${f[0]}">${f[1]}</button>`).join('');
+  document.querySelectorAll('#tenChips .chip').forEach(c=>c.onclick=()=>{ui.tenF=c.dataset.f;saveUi();render()});
+  const qi=$('#tenQ');if(qi.value!==ui.tenQ&&document.activeElement!==qi)qi.value=ui.tenQ;
+  const q=ui.tenQ.trim();
+  const l=tenants.filter(t=>{const s=contractState(t);
+    if(ui.tenF==='active'&&s!=='active')return false; if(ui.tenF==='exp'&&!expSoon(t))return false;
+    if(ui.tenF==='new'&&!(isNew(t)&&s!=='evicted'))return false; if(['pending','ended','evicted'].includes(ui.tenF)&&s!==ui.tenF)return false;
+    if(ui.tenF==='debt'&&tenantOpen(t.id)<=0)return false;
+    if(q&&!((t.name||'')+' '+(t.contact||'')+' '+(t.phone||'')+' '+(t.unit||'')).includes(q))return false; return true}).sort((a,b)=>(a.no||0)-(b.no||0));
+  $('#tenRows').innerHTML=l.length?l.map(t=>{const o=tenantOpen(t.id);return `<tr data-id="${t.id}"><td class="n">${t.no||''}</td><td><span class="nm">${esc(t.name)}</span>${t.unit?'<span class="note">'+esc(t.unit)+'</span>':''}</td><td class="n">${fmt(t.rent)}</td><td class="n">${fmt(t.installment)}<span class="note">كل ${t.everyMonths||12} شهر</span></td><td class="n">${fd(t.nextDue)}</td><td class="n">${fd(t.start)}</td><td class="n">${fd(t.end)}</td><td>${cPill(t)}</td><td class="n">${o>0?'<b style="color:var(--bad)">'+fmt(o)+'</b>':'—'}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${tenants.length?'لا توجد عقود بهذا التصفية.':emptyMsg()}</td></tr>`;
+  $('#tenFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.rent||0),0))}</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.installment||0),0))}</td><td colspan="4"></td><td class="n">${fmt(l.reduce((a,t)=>a+tenantOpen(t.id),0))}</td></tr>`:'';
+  document.querySelectorAll('#tenRows tr[data-id]').forEach(tr=>tr.onclick=()=>openTenant(tr.dataset.id));
+}
+
+/* ---------- drawers ---------- */
+let current=null;
+function drawer(title,body,foot){
+  $('#layer').innerHTML=`<div class="scrim" id="scrim"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="hd"><h3>${title}</h3><button class="btn ghost" id="xClose" aria-label="إغلاق">✕</button></div><div class="bd">${body}</div>${foot?`<div class="ft">${foot}</div>`:''}</aside>`;
+  $('#scrim').onclick=close;$('#xClose').onclick=close;
+  const f=$('#layer').querySelector('input,select,textarea');if(f)setTimeout(()=>f.focus(),30);
+}
+function close(){$('#layer').innerHTML='';current=null}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+const val=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
+function stageSteps(cur){return `<div class="steps">${STAGE_KEYS.slice(0,8).map((k,i)=>{const ci=STAGE_KEYS.indexOf(cur);return `<span class="${k===cur?'cur':ci>i&&ci<8?'done':''}">${i+1}. ${esc(k)}</span>`}).join('')}${cur==='في مرحلة التحويل'?'<span class="cur">في مرحلة التحويل</span>':''}</div>`}
+
+function openDue(id){
+  const d=dues.find(x=>x.id===id);if(!d)return;current={t:'due',id};
+  const s=dueStatus(d);const t=tById(d.tenantId);
+  const pays=(d.payments||[]).map(p=>`<div class="ev"><b class="num">${fmt(p.amount)} ر.س</b><small>${fd(p.date)}${p.method?' — '+esc(p.method):''}${p.note?' — '+esc(p.note):''}</small></div>`).join('');
+  const hist=(d.history||[]).slice().reverse().map(h=>`<div class="ev"><b>${esc(h.stage||'')}</b><small>${fd(h.date)}</small>${h.note?`<div>${esc(h.note)}</div>`:''}</div>`).join('');
+  drawer(esc(d.tenantName),`
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${pill(s)} ${s!=='paid'&&stageOver(d)?'<span class="pill p-late">تجاوز مدة المرحلة</span>':''}</div>
+    <dl class="dl"><dt>الفترة</dt><dd>${esc(d.period||'')}</dd><dt>تاريخ الاستحقاق</dt><dd>${fd(d.dueDate)} <small>(${d.dueDate<=TODAY?'منذ '+days(d.dueDate,TODAY)+' يوم':'بعد '+days(TODAY,d.dueDate)+' يوم'})</small></dd>
+    <dt>المبلغ</dt><dd class="num">${fmt(d.amount)}</dd><dt>المدفوع</dt><dd class="num">${fmt(paidOf(d))}</dd><dt>المتبقي</dt><dd class="num"><b>${fmt(remOf(d))}</b></dd>
+    <dt>الفوترة</dt><dd>${bPill(d)}${d.invNo?' رقم <span class="num">'+esc(d.invNo)+'</span>':''}${d.invDate?' بتاريخ '+fd(d.invDate):''}</dd>
+    <dt>المرحلة الحالية</dt><dd>${esc(d.stage||'')} — منذ ${fd(d.stageDate)} (${stageAge(d)} يوم)</dd>
+    ${t?`<dt>التواصل</dt><dd>${esc(t.contact||'—')} ${t.phone?'· <span class="copy num" data-copy="'+esc(t.phone)+'">'+esc(t.phone)+'</span>':''}</dd>`:''}</dl>
+    ${stageSteps(d.stage)}
+    <div><h4>سجل الإجراءات والتواصل</h4><div class="tl">${hist||'<div class="ev"><small>لا يوجد سجل</small></div>'}</div></div>
+    <div><h4>الدفعات المستلمة</h4><div class="tl">${pays||'<div class="ev"><small>لا توجد دفعات مسجلة</small></div>'}</div></div>
+    <div id="delBox"></div>`,
+    `${billOf(d)!=='sent'?`<button class="btn" id="dBill">${billOf(d)==='none'?'تسجيل الفاتورة':'تم الإرسال للعميل'}</button>`:''}<button class="btn pri" id="dPay">تسجيل دفعة</button><button class="btn" id="dStg">إجراء / نقل مرحلة</button><button class="btn" id="dEdit">تعديل</button>${t?'<button class="btn" id="dTen">ملف المستأجر</button>':''}<button class="btn ghost danger" id="dDel" style="margin-inline-start:auto">حذف</button>`);
+  $('#dPay').onclick=()=>openPay(id);if($('#dBill'))$('#dBill').onclick=()=>billForm(id);$('#dStg').onclick=()=>openStage(id);$('#dEdit').onclick=()=>dueForm(d);
+  if(t)$('#dTen').onclick=()=>openTenant(t.id);
+  bindCopy();
+  $('#dDel').onclick=()=>{$('#delBox').innerHTML=`<div class="confirm">حذف هذه المطالبة نهائياً؟ <button class="btn sm danger" id="dDelY">نعم، احذف</button><button class="btn sm" id="dDelN">إلغاء</button></div>`;$('#dDelN').onclick=()=>$('#delBox').innerHTML='';$('#dDelY').onclick=async()=>{await del('dues',id);close();toast('تم حذف المطالبة')}};
+}
+function bindCopy(){document.querySelectorAll('[data-copy]').forEach(e=>e.onclick=()=>{const v=e.dataset.copy;Promise.resolve().then(()=>navigator.clipboard.writeText(v)).then(()=>toast('تم نسخ الرقم'),()=>{const r=document.createRange();r.selectNodeContents(e);const s=getSelection();s.removeAllRanges();s.addRange(r)})})}
+
+function openPay(id){
+  const d=dues.find(x=>x.id===id);if(!d)return;
+  drawer('تسجيل دفعة — '+esc(d.tenantName),`<div class="form">
+    <label>المبلغ المستلم<input id="pAmt" type="number" step="0.01" inputmode="decimal" value="${remOf(d)}"></label>
+    <label>تاريخ الاستلام<input id="pDate" type="date" value="${TODAY}"></label>
+    <label>طريقة الدفع<select id="pMeth"><option>تحويل بنكي</option><option>شيك</option><option>نقداً</option><option>سند أمر</option><option>نقاط بيع</option><option>تسوية / خصم</option></select></label>
+    <label>المتبقي قبل الدفعة<input id="pRem" disabled value="${fmt(remOf(d))}"></label>
+    <label class="full">ملاحظة<input id="pNote" placeholder="رقم الحوالة، اسم البنك…"></label></div>`,
+    `<button class="btn pri" id="pSave">حفظ الدفعة</button><button class="btn" id="pCancel">إلغاء</button>`);
+  $('#pCancel').onclick=()=>openDue(id);
+  $('#pSave').onclick=async()=>{const a=+val('pAmt');if(!(a>0)){toast('أدخل مبلغاً صحيحاً');return}
+    const p={date:val('pDate')||TODAY,amount:a,method:val('pMeth'),note:val('pNote')};
+    const nd={...d,payments:[...(d.payments||[]),p]};
+    const rem=(+nd.amount||0)-paidOf(nd);
+    nd.history=[...(d.history||[]),{date:p.date,stage:rem<=0.5?'سداد كامل':'سداد جزئي',note:`استلام ${fmt(a)} — ${p.method}${p.note?' — '+p.note:''}`}];
+    if(rem<=0.5)nd.closed=true;
+    if(await put('dues',nd)){toast(rem<=0.5?'تم السداد الكامل وإغلاق المطالبة':'تم تسجيل الدفعة');openDue(id)}};
+}
+function openStage(id,preset){
+  const d=dues.find(x=>x.id===id);if(!d)return;
+  const ci=STAGE_KEYS.indexOf(d.stage);const nxt=preset||(ci>=0&&ci<7?STAGE_KEYS[ci+1]:d.stage);
+  drawer('إجراء تحصيل — '+esc(d.tenantName),`${stageSteps(d.stage)}<div class="form">
+    <label>المرحلة<select id="sStage">${STAGE_KEYS.map(k=>`<option ${k===nxt?'selected':''}>${esc(k)}</option>`).join('')}</select></label>
+    <label>تاريخ الإجراء<input id="sDate" type="date" value="${TODAY}"></label>
+    <label class="full">ما الذي تم؟<textarea id="sNote" placeholder="مثال: تم التواصل مع المسؤول ووعد بالتحويل نهاية الأسبوع"></textarea></label></div>
+    <div class="legend">اختيار نفس المرحلة الحالية يسجّل متابعة دون نقل المرحلة.</div>`,
+    `<button class="btn pri" id="sSave">حفظ الإجراء</button><button class="btn" id="sCancel">إلغاء</button>`);
+  $('#sCancel').onclick=()=>openDue(id);
+  $('#sSave').onclick=async()=>{const st=val('sStage'),dt=val('sDate')||TODAY,note=val('sNote');
+    const moved=st!==d.stage;if(!moved&&!note){toast('اكتب ملاحظة المتابعة أو اختر مرحلة جديدة');return}
+    const nd={...d,stage:st,stageDate:moved?dt:d.stageDate,history:[...(d.history||[]),{date:dt,stage:st,note:note||(moved?'نقل إلى '+st:'')}]};
+    if(note)nd.notes=note;
+    if(await put('dues',nd)){toast(moved?'تم النقل إلى '+st:'تم تسجيل المتابعة');openDue(id)}};
+}
+function billForm(id){
+  const d=dues.find(x=>x.id===id);if(!d)return;const cur=billOf(d);const nx=cur==='none'?'inv':'sent';
+  drawer('حالة الفاتورة — '+esc(d.tenantName),`<div class="form">
+    <label>حالة الفوترة<select id="bSt">${Object.entries(BILL).map(([k,v])=>`<option value="${k}" ${k===nx?'selected':''}>${v[0]}</option>`).join('')}</select></label>
+    <label>رقم الفاتورة<input id="bNo" value="${esc(d.invNo||'')}"></label>
+    <label>تاريخ الفاتورة<input id="bDate" type="date" value="${d.invDate||TODAY}"></label>
+    <label>مبلغ الفاتورة<input disabled value="${fmt(d.amount)}"></label>
+    <label class="full">ملاحظة<input id="bNote" placeholder="مثال: أُرسلت بالبريد إلى المسؤول"></label></div>`,
+    `<button class="btn pri" id="bSave">حفظ</button><button class="btn" id="bCancel">إلغاء</button>`);
+  $('#bCancel').onclick=()=>openDue(id);
+  $('#bSave').onclick=async()=>{const st=val('bSt');const nd={...d,billing:st,invNo:val('bNo'),invDate:st==='none'?'':(val('bDate')||TODAY)};
+    nd.history=[...(d.history||[]),{date:TODAY,stage:BILL[st][0],note:(nd.invNo?'فاتورة رقم '+nd.invNo:'')+(val('bNote')?(nd.invNo?' — ':'')+val('bNote'):'')}];
+    if(await put('dues',nd)){toast('تم تحديث حالة الفاتورة');openDue(id)}};
+}
+function dueForm(d){
+  const isNew=!d;d=d||{id:uid('d'),tenantId:'',tenantName:'',period:'',amount:'',dueDate:TODAY,stage:'المطالبة',stageDate:TODAY,payments:[],history:[],notes:'',closed:false,billing:'none',invNo:'',invDate:''};
+  const opts=tenants.slice().sort((a,b)=>a.name.localeCompare(b.name,'ar')).map(t=>`<option value="${t.id}" ${t.id===d.tenantId?'selected':''}>${esc(t.name)}</option>`).join('');
+  drawer(isNew?'مطالبة جديدة':'تعديل المطالبة',`<div class="form">
+    <label class="full">المستأجر<select id="fTen"><option value="">— اختر —</option>${opts}</select></label>
+    <label>الفترة / البيان<input id="fPer" value="${esc(d.period||'')}" placeholder="مثال: أكتوبر 2026"></label>
+    <label>المبلغ<input id="fAmt" type="number" step="0.01" value="${d.amount}"></label>
+    <label>تاريخ الاستحقاق<input id="fDue" type="date" value="${d.dueDate||''}"></label>
+    <label>المرحلة<select id="fStg">${STAGE_KEYS.map(k=>`<option ${k===d.stage?'selected':''}>${esc(k)}</option>`).join('')}</select></label>
+    <label>حالة الفوترة<select id="fBill">${Object.entries(BILL).map(([k,v])=>`<option value="${k}" ${k===billOf(d)?'selected':''}>${v[0]}</option>`).join('')}</select></label>
+    <label>رقم الفاتورة<input id="fInv" value="${esc(d.invNo||'')}"></label>
+    <label class="full">ملاحظات<textarea id="fNote">${esc(d.notes||'')}</textarea></label>
+    ${!isNew?`<label class="full" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="fClosed" style="width:auto" ${d.closed?'checked':''}> إغلاق المطالبة (تسوية / إعفاء)</label>`:''}</div>`,
+    `<button class="btn pri" id="fSave">حفظ</button><button class="btn" id="fCancel">إلغاء</button>`);
+  $('#fTen').onchange=()=>{const t=tById(val('fTen'));if(t&&!val('fAmt'))$('#fAmt').value=t.installment||''};
+  $('#fCancel').onclick=()=>isNew?close():openDue(d.id);
+  $('#fSave').onclick=async()=>{const t=tById(val('fTen'));if(!t){toast('اختر المستأجر');return}if(!(+val('fAmt')>0)){toast('أدخل المبلغ');return}
+    const st=val('fStg');const nd={...d,tenantId:t.id,tenantName:t.name,period:val('fPer'),amount:+val('fAmt'),dueDate:val('fDue')||TODAY,stage:st,notes:val('fNote'),billing:val('fBill'),invNo:val('fInv'),invDate:val('fBill')==='none'?'':(d.invDate||TODAY)};
+    if(st!==d.stage||isNew){nd.stageDate=TODAY;nd.history=[...(d.history||[]),{date:TODAY,stage:st,note:isNew?'إنشاء المطالبة'+(nd.notes?' — '+nd.notes:''):'تعديل المرحلة'}]}
+    if(!isNew)nd.closed=$('#fClosed').checked;
+    if(await put('dues',nd)){toast('تم الحفظ');openDue(nd.id)}};
+}
+
+function openTenant(id){
+  const t=tById(id);if(!t)return;current={t:'ten',id};
+  const ds=dues.filter(d=>d.tenantId===id).sort((a,b)=>b.dueDate.localeCompare(a.dueDate));
+  drawer(esc(t.name),`<div style="display:flex;gap:8px;flex-wrap:wrap">${cPill(t)}</div>
+    <dl class="dl"><dt>رقم العقد/المحل</dt><dd>${t.no||''}${t.unit?' — '+esc(t.unit):''}</dd><dt>الإيجار السنوي شامل الضريبة</dt><dd class="num">${fmt(t.rent)}</dd>
+    <dt>قيمة الدفعة</dt><dd class="num">${fmt(t.installment)} — كل ${t.everyMonths||12} شهر</dd><dt>الاستحقاق القادم</dt><dd>${fd(t.nextDue)}</dd>
+    <dt>مدة العقد</dt><dd>${fd(t.start)} ← ${fd(t.end)}</dd><dt>رصيد مفتوح</dt><dd class="num"><b>${fmt(tenantOpen(id))}</b></dd>
+    <dt>المسؤول</dt><dd>${esc(t.contact||'—')}</dd><dt>الجوال</dt><dd>${t.phone?'<span class="copy num" data-copy="'+esc(t.phone)+'">'+esc(t.phone)+'</span>':'—'}</dd>
+    <dt>البريد</dt><dd>${esc(t.email||'—')}</dd><dt>مهمة ClickUp</dt><dd>${t.link?`<a href="${esc(t.link)}" target="_blank" rel="noopener">فتح المهمة</a>`:'—'}</dd>
+    ${t.notes?`<dt>ملاحظات</dt><dd>${esc(t.notes)}</dd>`:''}</dl>
+    <div><h4>المطالبات (${ds.length})</h4>${ds.length?`<div class="tbl"><table><thead><tr><th>الفترة</th><th>الاستحقاق</th><th>المتبقي</th><th>الحالة</th><th>الفوترة</th><th>المرحلة</th></tr></thead><tbody>${ds.map(d=>`<tr data-d="${d.id}"><td>${esc(d.period||'')}</td><td class="n">${fd(d.dueDate)}</td><td class="n">${fmt(remOf(d))}</td><td>${pill(dueStatus(d))}</td><td>${bPill(d)}</td><td>${dueStatus(d)==='paid'?'—':esc(d.stage||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">لا توجد مطالبات</div>'}</div>
+    <div id="delBox"></div>`,
+    `${t.nextDue&&+t.installment?'<button class="btn pri" id="tIssue">إصدار مطالبة الدفعة القادمة</button>':''}<button class="btn" id="tEdit">تعديل العقد</button><button class="btn" id="tDue">مطالبة يدوية</button><button class="btn ghost danger" id="tDel" style="margin-inline-start:auto">حذف</button>`);
+  document.querySelectorAll('[data-d]').forEach(r=>r.onclick=()=>openDue(r.dataset.d));
+  bindCopy();
+  if($('#tIssue'))$('#tIssue').onclick=async()=>{await issue(id,$('#tIssue'));openTenant(id)};
+  $('#tEdit').onclick=()=>tenantForm(t);
+  $('#tDue').onclick=()=>{dueForm(null);$('#fTen').value=id;$('#fAmt').value=t.installment||''};
+  $('#tDel').onclick=()=>{$('#delBox').innerHTML=`<div class="confirm">حذف ملف المستأجر؟ مطالباته تبقى في السجل. <button class="btn sm danger" id="tDelY">نعم، احذف</button><button class="btn sm" id="tDelN">إلغاء</button></div>`;$('#tDelN').onclick=()=>$('#delBox').innerHTML='';$('#tDelY').onclick=async()=>{await del('tenants',id);close();toast('تم حذف الملف')}};
+}
+function tenantForm(t){
+  const isNew=!t;const nextNo=Math.max(0,...tenants.filter(x=>x.no<100).map(x=>+x.no||0))+1;
+  t=t||{id:uid('t'),no:nextNo,name:'',unit:'',rent:'',installment:'',everyMonths:6,nextDue:'',start:'',end:'',contact:'',phone:'',email:'',link:'',state:'pending',notes:''};
+  drawer(isNew?'عقد جديد':'تعديل العقد',`<div class="form">
+    <label class="full">اسم المستأجر / المنشأة<input id="eName" value="${esc(t.name)}"></label>
+    <label>رقم المستأجر<input id="eNo" type="number" value="${t.no||''}"></label>
+    <label>رقم المحل / الموقع<input id="eUnit" value="${esc(t.unit||'')}"></label>
+    <label>الإيجار السنوي شامل الضريبة<input id="eRent" type="number" step="0.01" value="${t.rent}"></label>
+    <label>دورية الدفع<select id="eEvery">${[[1,'شهري'],[2,'كل شهرين'],[3,'ربع سنوي'],[4,'كل 4 أشهر'],[6,'نصف سنوي'],[12,'سنوي']].map(o=>`<option value="${o[0]}" ${+t.everyMonths===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></label>
+    <label>قيمة الدفعة<input id="eInst" type="number" step="0.01" value="${t.installment}"></label>
+    <label>الاستحقاق القادم<input id="eNext" type="date" value="${t.nextDue||''}"></label>
+    <label>بداية العقد<input id="eStart" type="date" value="${t.start||''}"></label>
+    <label>نهاية العقد<input id="eEnd" type="date" value="${t.end||''}"></label>
+    <label>حالة العقد<select id="eState">${Object.entries({active:'ساري',pending:'قيد التوثيق',evicted:'تم الإخلاء'}).map(([k,v])=>`<option value="${k}" ${t.state===k?'selected':''}>${v}</option>`).join('')}</select></label>
+    <label>اسم المسؤول<input id="eCon" value="${esc(t.contact||'')}"></label>
+    <label>الجوال<input id="ePhone" inputmode="tel" value="${esc(t.phone||'')}"></label>
+    <label>البريد الإلكتروني<input id="eMail" type="email" value="${esc(t.email||'')}"></label>
+    <label class="full">رابط مهمة ClickUp<input id="eLink" value="${esc(t.link||'')}"></label>
+    <label class="full">ملاحظات<textarea id="eNote">${esc(t.notes||'')}</textarea></label></div>
+    <div class="legend">«ساري» يتحول تلقائياً إلى «منتهي» بعد تاريخ نهاية العقد.</div>`,
+    `<button class="btn pri" id="eSave">حفظ</button><button class="btn" id="eCancel">إلغاء</button>`);
+  const calc=()=>{const r=+val('eRent'),e=+val('eEvery');if(r>0&&!$('#eInst').dataset.touched)$('#eInst').value=Math.round(r*e/12*100)/100};
+  $('#eInst').oninput=()=>$('#eInst').dataset.touched=1;$('#eRent').oninput=calc;$('#eEvery').onchange=calc;
+  $('#eCancel').onclick=()=>isNew?close():openTenant(t.id);
+  $('#eSave').onclick=async()=>{if(!val('eName')){toast('أدخل اسم المستأجر');return}
+    const nt={...t,name:val('eName'),no:+val('eNo')||t.no,unit:val('eUnit'),rent:+val('eRent')||0,everyMonths:+val('eEvery'),installment:+val('eInst')||0,nextDue:val('eNext')||null,start:val('eStart')||null,end:val('eEnd')||null,state:val('eState'),contact:val('eCon'),phone:val('ePhone'),email:val('eMail'),link:val('eLink'),notes:val('eNote')};
+    if(await put('tenants',nt)){
+      if(!isNew&&nt.name!==t.name){for(const d of dues.filter(x=>x.tenantId===t.id))await put('dues',{...d,tenantName:nt.name})}
+      toast('تم الحفظ');openTenant(nt.id)}};
+}
+
+/* ---------- export ---------- */
+async function exportXlsx(dl){
+  const wb=XLSX.utils.book_new();
+  const T=tenants.slice().sort((a,b)=>(a.no||0)-(b.no||0)).map(t=>({'م':t.no,'المستأجر':t.name,'المحل':t.unit,'الإيجار السنوي':+t.rent||0,'قيمة الدفعة':+t.installment||0,'الدورية (أشهر)':t.everyMonths,'الاستحقاق القادم':t.nextDue,'بداية العقد':t.start,'نهاية العقد':t.end,'حالة العقد':STATE[contractState(t)],'رصيد مفتوح':tenantOpen(t.id),'المسؤول':t.contact,'الجوال':t.phone,'البريد':t.email,'ClickUp':t.link,'ملاحظات':t.notes}));
+  const D=dues.slice().sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).map(d=>({'المستأجر':d.tenantName,'الفترة':d.period,'الاستحقاق':d.dueDate,'المبلغ':+d.amount||0,'المدفوع':paidOf(d),'المتبقي':remOf(d),'الحالة':ST[dueStatus(d)][0],'الفوترة':BILL[billOf(d)][0],'رقم الفاتورة':d.invNo||'','تاريخ الفاتورة':d.invDate||'','المرحلة':d.stage,'تاريخ المرحلة':d.stageDate,'أيام في المرحلة':stageAge(d),'آخر ملاحظة':lastNote(d)}));
+  const P=[];dues.forEach(d=>(d.payments||[]).forEach(p=>P.push({'المستأجر':d.tenantName,'الفترة':d.period,'التاريخ':p.date,'المبلغ':+p.amount,'الطريقة':p.method,'ملاحظة':p.note})));
+  [[D,'المطالبات'],[T,'العقود'],[P,'الدفعات المستلمة']].forEach(([rows,n])=>{const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{'':''}]);ws['!views']=[{RTL:true}];XLSX.utils.book_append_sheet(wb,ws,n)});
+  wb.Workbook={Views:[{RTL:true}]};
+  if(!dl){try{XLSX.writeFile(wb,'إيجارات كرم مول '+TODAY+'.xlsx')}catch(e){toast('تعذّر تصدير الملف')}return}
+  const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  try{await dl.save({filename:'إيجارات كرم مول '+TODAY+'.xlsx',data:new Blob([buf])});}catch(e){if(e&&e.code!=='declined')toast('تعذّر تصدير الملف')}
+}
+
+/* ---------- nav ---------- */
+function go(v){ui.view=v;saveUi();render();window.scrollTo(0,0)}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+let tq;$('#dueQ').oninput=e=>{clearTimeout(tq);tq=setTimeout(()=>{ui.dueQ=e.target.value;render()},200)};
+$('#tenQ').oninput=e=>{clearTimeout(tq);tq=setTimeout(()=>{ui.tenQ=e.target.value;render()},200)};
+$('#btnNewTenant').onclick=()=>tenantForm(null);
+$('#btnNewDue').onclick=()=>dueForm(null);
+boot();
+})();
+</script>
+
+</body>
+</html>
