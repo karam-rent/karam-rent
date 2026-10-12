@@ -410,7 +410,8 @@ async function bootSupabase(){
 async function startSession(session){
   if(started)return;started=true;hideAuth();
   MY_EMAIL=(session.user.email||'').toLowerCase();
-  const {data:u}=await sb.from('app_users').select('role').eq('email',MY_EMAIL).maybeSingle();
+  const {data:u,error:ue}=await sb.from('app_users').select('role').eq('email',MY_EMAIL).maybeSingle();
+  if(ue){$('#whoBox').hidden=false;$('#whoTxt').textContent=MY_EMAIL;const n=$('#noDb');n.hidden=false;n.textContent='قاعدة البيانات غير مجهزة بعد: شغّل ملف 1_schema.sql ثم 2_seed.sql في Supabase ← SQL Editor، ثم أعد تحميل الصفحة. ('+ue.message+')';$('#syncTxt').textContent='غير مجهزة';$('#btnNewDue').hidden=true;$('#btnNewTenant').hidden=true;return}
   MY_ROLE=u?u.role:null;
   $('#whoBox').hidden=false;$('#whoTxt').textContent=MY_EMAIL+(MY_ROLE?' · '+ROLES[MY_ROLE][0]:'');
   if(!MY_ROLE){const n=$('#noDb');n.hidden=false;n.textContent='حسابك ('+MY_EMAIL+') غير مضاف للنظام. اطلب من مدير النظام إضافة بريدك من شاشة «المستخدمون» ثم أعد تحميل الصفحة.';$('#syncTxt').textContent='بدون صلاحية';$('#btnNewDue').hidden=true;$('#btnNewTenant').hidden=true;return}
