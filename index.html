@@ -596,8 +596,12 @@ async function issue(tid,btn){
 }
 
 function monthList(){const n=parse(TODAY);const out=[];for(let i=0;i<12;i++){const d=new Date(n.getFullYear(),n.getMonth()+i,1);out.push({ym:d.getFullYear()+'-'+pad(d.getMonth()+1),label:MONTHS[d.getMonth()]+' '+d.getFullYear()})}return out}
-function payInMonth(t,ym){ // first installment date of this tenant inside month ym
-  if(!t.nextDue||!(+t.installment)||contractState(t)==='evicted')return null;
+function issuedOpen(t){return dues.filter(d=>d.tenantId===t.id&&!d.closed&&remOf(d)>0.5&&d.dueDate>=TODAY).map(d=>d.dueDate).sort()}
+function nextPay(t){const ds=issuedOpen(t);return ds[0]&&(!t.nextDue||ds[0]<t.nextDue)?ds[0]:t.nextDue}
+function payInMonth(t,ym){ // installment date of this tenant inside month ym (issued claim first, then contract schedule)
+  if(contractState(t)==='evicted')return null;
+  const iss=dues.find(d=>d.tenantId===t.id&&!d.closed&&d.dueDate&&d.dueDate.slice(0,7)===ym);if(iss)return iss.dueDate;
+  if(!t.nextDue||!(+t.installment))return null;
   let nd=t.nextDue,g=0;const step=+t.everyMonths||12;
   while(nd.slice(0,7)<ym&&g++<60)nd=addM(nd,step);
   if(nd.slice(0,7)!==ym)return null; if(t.end&&nd>t.end)return null; return nd}
@@ -624,7 +628,7 @@ function rTen(){
   renderTenRows(L,MD,hl);
 }
 function renderTenRows(l,MD,hl){
-  const dueCell=t=>hl('due')?`<b>${fd(MD.get(t.id))}</b>`:fd(t.nextDue);
+  const dueCell=t=>hl('due')?`<b>${fd(MD.get(t.id))}</b>`:fd(nextPay(t));
   $('#tenRows').innerHTML=l.length?l.map(t=>{const o=tenantOpen(t.id);return `<tr data-id="${t.id}"><td class="n">${t.no||''}</td><td><span class="nm">${esc(t.name)}</span>${t.unit?'<span class="note">'+esc(t.unit)+'</span>':''}</td><td class="n">${fmt(t.rent)}</td><td class="n">${fmt(t.installment)}<span class="note">كل ${t.everyMonths||12} شهر</span></td><td class="n">${dueCell(t)}</td><td class="n">${hl('start')?'<b>'+fd(t.start)+'</b>':fd(t.start)}</td><td class="n">${hl('end')?'<b>'+fd(t.end)+'</b>':fd(t.end)}</td><td>${cPill(t)}</td><td class="n">${o>0?'<b style="color:var(--bad)">'+fmt(o)+'</b>':'—'}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${tenants.length?'لا توجد عقود بهذا التصفية.':emptyMsg()}</td></tr>`;
   $('#tenFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.rent||0),0))}</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.installment||0),0))}</td><td colspan="4">${hl('due')?'<span class="note">إجمالي الدفعات المستحقة في الشهر المختار</span>':''}</td><td class="n">${fmt(l.reduce((a,t)=>a+tenantOpen(t.id),0))}</td></tr>`:'';
   document.querySelectorAll('#tenRows tr[data-id]').forEach(tr=>tr.onclick=()=>openTenant(tr.dataset.id));
@@ -848,7 +852,7 @@ function openTenant(id){
   const ds=dues.filter(d=>d.tenantId===id).sort((a,b)=>b.dueDate.localeCompare(a.dueDate));
   drawer(esc(t.name),`<div style="display:flex;gap:8px;flex-wrap:wrap">${cPill(t)}</div>
     <dl class="dl"><dt>رقم العقد/المحل</dt><dd>${t.no||''}${t.unit?' — '+esc(t.unit):''}</dd><dt>الإيجار السنوي شامل الضريبة</dt><dd class="num">${fmt(t.rent)}</dd>
-    <dt>قيمة الدفعة</dt><dd class="num">${fmt(t.installment)} — كل ${t.everyMonths||12} شهر</dd><dt>الاستحقاق القادم</dt><dd>${fd(t.nextDue)}</dd>
+    <dt>قيمة الدفعة</dt><dd class="num">${fmt(t.installment)} — كل ${t.everyMonths||12} شهر</dd><dt>الدفعة القادمة</dt><dd>${fd(nextPay(t))}${issuedOpen(t).length&&nextPay(t)!==t.nextDue?' <small>(صدرت مطالبتها — الدفعة التي بعدها '+fd(t.nextDue)+')</small>':''}</dd>
     <dt>مدة العقد</dt><dd>${fd(t.start)} ← ${fd(t.end)}</dd><dt>رصيد مفتوح</dt><dd class="num"><b>${fmt(tenantOpen(id))}</b></dd>
     <dt>المسؤول</dt><dd>${esc(t.contact||'—')}</dd><dt>الجوال</dt><dd>${t.phone?'<span class="copy num" data-copy="'+esc(t.phone)+'">'+esc(t.phone)+'</span>':'—'}</dd>
     <dt>البريد</dt><dd>${esc(t.email||'—')}</dd><dt>مهمة ClickUp</dt><dd>${t.link?`<a href="${esc(t.link)}" target="_blank" rel="noopener">فتح المهمة</a>`:'—'}</dd>
