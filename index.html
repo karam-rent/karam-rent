@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f6b55">
+<meta name="theme-color" content="#2a1460">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="إيجارات كرم مول">
@@ -21,21 +21,21 @@
 <style>
 /* Layout: RTL operations console — sticky header + tabs, summary first, tables & stage board below, side drawer for records */
 :root{
-  --bg:#f3f5f4; --surface:#ffffff; --surface-2:#eef2f0; --line:#d9e0dc; --fg:#17211d; --muted:#5d6b65;
-  --accent:#0f6b55; --accent-ink:#ffffff; --accent-soft:#dcefe8; --brass:#9a6a12;
+  --bg:#f6f5f8; --surface:#ffffff; --surface-2:#efedf3; --line:#dcd8e4; --fg:#1a1426; --muted:#625c70;
+  --accent:#2a1460; --accent-ink:#ffffff; --accent-soft:#ebe6f4; --brass:#a87c3d;
   --ok:#1d7a46; --ok-soft:#dff3e6; --warn:#a15c00; --warn-soft:#fdf0d9; --bad:#b4282d; --bad-soft:#fbe3e3; --info:#2456a6; --info-soft:#e2ebfa;
   --shadow:0 8px 30px rgba(10,30,22,.14);
   --f-display:"Readex Pro","IBM Plex Sans Arabic",Tahoma,sans-serif;
   --f-body:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0f1513; --surface:#161e1b; --surface-2:#1d2723; --line:#2b3833; --fg:#e4ece8; --muted:#94a59d;
-  --accent:#3fbf98; --accent-ink:#06231a; --accent-soft:#163a30; --brass:#d6a54c;
+  --bg:#121019; --surface:#1a1724; --surface-2:#221e2e; --line:#332d42; --fg:#ebe8f2; --muted:#9d97ab;
+  --accent:#b7a3e6; --accent-ink:#160b30; --accent-soft:#2b2445; --brass:#d4a862;
   --ok:#5cd08f; --ok-soft:#163625; --warn:#f0a948; --warn-soft:#3a2a12; --bad:#f07a7d; --bad-soft:#3d1a1c; --info:#7fa8f0; --info-soft:#1a2740;
   --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0f1513; --surface:#161e1b; --surface-2:#1d2723; --line:#2b3833; --fg:#e4ece8; --muted:#94a59d;
-  --accent:#3fbf98; --accent-ink:#06231a; --accent-soft:#163a30; --brass:#d6a54c;
+  --bg:#121019; --surface:#1a1724; --surface-2:#221e2e; --line:#332d42; --fg:#ebe8f2; --muted:#9d97ab;
+  --accent:#b7a3e6; --accent-ink:#160b30; --accent-soft:#2b2445; --brass:#d4a862;
   --ok:#5cd08f; --ok-soft:#163625; --warn:#f0a948; --warn-soft:#3a2a12; --bad:#f07a7d; --bad-soft:#3d1a1c; --info:#7fa8f0; --info-soft:#1a2740;
   --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark}
 *{box-sizing:border-box}
@@ -48,7 +48,10 @@ a{color:var(--accent)}
 .wrap{max-width:1320px;margin:0 auto;padding-inline:16px}
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
 .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:12px}
-.brand{display:flex;flex-direction:column;margin-inline-end:auto;min-width:0}
+.brand{display:flex;align-items:center;gap:10px;margin-inline-end:auto;min-width:0}
+.brand>div{display:flex;flex-direction:column;min-width:0}
+.brand .mark{width:38px;height:38px;object-fit:contain;flex:none}
+header.top{border-bottom:2px solid var(--brass)!important}
 .brand h1{font-family:var(--f-display);font-size:20px;margin:0;font-weight:700;letter-spacing:0}
 .brand span{color:var(--muted);font-size:12px}
 .sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
@@ -103,6 +106,12 @@ section.view{display:flex;flex-direction:column;gap:18px}
 .toolbar input[type=search]{flex:1 1 220px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:13px}
+.monthbar{align-items:flex-start}
+.monthbar select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px}
+.monthbar .chip{font-size:12px;padding:4px 10px}
+.monthbar .chip .ct{display:inline-block;min-width:18px;margin-inline-start:6px;padding:0 5px;border-radius:9px;background:var(--surface-2);color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.monthbar .chip[aria-pressed="true"] .ct{background:rgba(255,255,255,.2);color:inherit}
+.monthbar .chip[aria-pressed="true"] small{color:inherit;opacity:.8}
 .chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -177,7 +186,7 @@ h4{margin:0 0 8px;font-size:13px;font-family:var(--f-display);font-weight:600}
 <header class="top">
   <div class="wrap">
     <div class="bar">
-      <div class="brand"><h1>إيجارات كرم مول</h1><span id="today"></span></div>
+      <div class="brand"><img src="mark.png" alt="" class="mark"><div><h1>إيجارات كرم مول</h1><span id="today"></span></div></div>
       <div class="sync"><span class="dot" id="dot"></span><span id="syncTxt">جارٍ الاتصال…</span></div>
       <span class="who" id="whoBox" hidden><span id="whoTxt"></span><button class="btn sm ghost" id="btnLogout">خروج</button></span>
       <button class="btn" id="btnShare" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-inline-end:4px"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M17 8v6M14 11h6"/></svg>المستخدمون</button>
@@ -244,6 +253,10 @@ h4{margin:0 0 8px;font-size:13px;font-family:var(--f-display);font-weight:600}
       <div class="chips" id="tenChips"></div>
       <input type="search" id="tenQ" placeholder="بحث بالاسم أو المسؤول أو الجوال">
     </div>
+    <div class="toolbar monthbar">
+      <select id="tenBasis" aria-label="أساس الفلترة الشهرية"><option value="due">حسب موعد الدفعة</option><option value="start">حسب بداية العقد</option><option value="end">حسب نهاية العقد</option></select>
+      <div class="chips" id="monthChips"></div>
+    </div>
     <div class="tbl"><table>
       <thead><tr><th>#</th><th>المستأجر</th><th>الإيجار السنوي</th><th>قيمة الدفعة</th><th>الاستحقاق القادم</th><th>بداية العقد</th><th>نهاية العقد</th><th>حالة العقد</th><th>رصيد مفتوح</th></tr></thead>
       <tbody id="tenRows"></tbody><tfoot id="tenFoot"></tfoot>
@@ -252,7 +265,7 @@ h4{margin:0 0 8px;font-size:13px;font-family:var(--f-display);font-weight:600}
 </main>
 <div id="layer"></div>
 <div class="auth" id="auth" hidden><form class="box" id="authForm" novalidate>
-  <div class="logo">ك</div>
+  <img src="logo.png" alt="كرم مول" style="width:150px;max-width:60%;align-self:center;margin-bottom:4px">
   <div><h2 id="aTitle">تسجيل الدخول</h2><p id="aSub">نظام متابعة عقود وتحصيل إيجارات كرم مول</p></div>
   <div class="msg" id="aMsg" hidden></div>
   <label id="aMailL">البريد الإلكتروني<input id="aMail" type="email" autocomplete="email" dir="ltr" required></label>
@@ -286,7 +299,7 @@ const STATE={active:'ساري',pending:'قيد التوثيق',ended:'منتهي
 let who={owner:null,edit:null,write:null};
 function showRO(){if(sb){toast('لا تملك صلاحية التعديل — صلاحيتك: مشاهد');return}const n=$('#noDb');n.hidden=false;n.innerHTML='هذا العرض لا يسمح بالحفظ (صلاحيتك هنا: '+(who.owner?'مالك':who.edit?'محرر':who.write?'مساهم':'عرض فقط')+'). افتح رابط الصفحة كاملاً في المتصفح وأنت مسجّل بنفس حساب claude.ai المالك للصفحة، أو اطلب من المالك مشاركتها معك بصلاحية Contributor.';toast('لم يتم الحفظ — هذا العرض للقراءة فقط')}
 let db=null, canWrite=null, tenants=[], dues=[], ready={t:false,d:false};
-const ui={view:'dash',dueF:'open',dueStage:'',dueBill:'',dueQ:'',upW:30,tenF:'all',tenQ:''};
+const ui={view:'dash',tenMonth:'',tenBasis:'due',dueF:'open',dueStage:'',dueBill:'',dueQ:'',upW:30,tenF:'all',tenQ:''};
 try{const s=JSON.parse(localStorage.getItem('krc-ui')||'{}');Object.assign(ui,s)}catch(e){}
 const saveUi=()=>{try{localStorage.setItem('krc-ui',JSON.stringify(ui))}catch(e){}};
 
@@ -303,7 +316,7 @@ const addM=(s,m)=>{const d=parse(s);const day=d.getDate();d.setDate(1);d.setMont
 const fd=s=>{if(!s)return '—';const [y,m,d]=s.split('-');return d+'/'+m+'/'+y};
 const MONTHS=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-$('#today').textContent='اليوم '+fd(TODAY)+' — متابعة العقود والتحصيل';
+$('#today').textContent='شركة مجمع كرم مول التجاري · '+fd(TODAY);
 
 const tById=id=>tenants.find(t=>t.id===id);
 const paidOf=d=>(d.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
@@ -373,7 +386,7 @@ function showAuth(mode,msg,kind){
   authMode=mode;const a=$('#auth');a.hidden=false;
   const T={login:['تسجيل الدخول','دخول','أول مرة؟ أنشئ كلمة مرور'],signup:['إنشاء كلمة مرور','إنشاء الحساب','لديك حساب؟ سجّل الدخول'],forgot:['استعادة كلمة المرور','إرسال رابط الاستعادة','رجوع لتسجيل الدخول'],reset:['كلمة مرور جديدة','حفظ كلمة المرور','']}[mode];
   $('#aTitle').textContent=T[0];$('#aBtn').textContent=T[1];$('#aSwitch').textContent=T[2];
-  $('#aSub').textContent=mode==='signup'?'استخدم البريد الذي أضافه مدير النظام لك.':mode==='forgot'?'نرسل لك رابطاً على بريدك لتعيين كلمة مرور جديدة.':mode==='reset'?'اكتب كلمة المرور الجديدة (6 أحرف على الأقل).':'نظام متابعة عقود وتحصيل إيجارات كرم مول';
+  $('#aSub').textContent=mode==='signup'?'استخدم البريد الذي أضافه مدير النظام لك.':mode==='forgot'?'نرسل لك رابطاً على بريدك لتعيين كلمة مرور جديدة.':mode==='reset'?'اكتب كلمة المرور الجديدة (6 أحرف على الأقل).':'شركة مجمع كرم مول التجاري — نظام متابعة العقود والتحصيل';
   $('#aMailL').hidden=mode==='reset';$('#aPassL').hidden=mode==='forgot';
   $('#aPass').autocomplete=mode==='login'?'current-password':'new-password';
   $('#aForgot').hidden=mode!=='login';$('#aSwitch').hidden=mode==='reset';
@@ -582,6 +595,13 @@ async function issue(tid,btn){
   else if(btn)btn.disabled=false;
 }
 
+function monthList(){const n=parse(TODAY);const out=[];for(let i=0;i<12;i++){const d=new Date(n.getFullYear(),n.getMonth()+i,1);out.push({ym:d.getFullYear()+'-'+pad(d.getMonth()+1),label:MONTHS[d.getMonth()]+' '+d.getFullYear()})}return out}
+function payInMonth(t,ym){ // first installment date of this tenant inside month ym
+  if(!t.nextDue||!(+t.installment)||contractState(t)==='evicted')return null;
+  let nd=t.nextDue,g=0;const step=+t.everyMonths||12;
+  while(nd.slice(0,7)<ym&&g++<60)nd=addM(nd,step);
+  if(nd.slice(0,7)!==ym)return null; if(t.end&&nd>t.end)return null; return nd}
+function monthDate(t,ym){const b=ui.tenBasis;if(b==='start')return t.start&&t.start.slice(0,7)===ym?t.start:null;if(b==='end')return t.end&&t.end.slice(0,7)===ym?t.end:null;return payInMonth(t,ym)}
 function rTen(){
   const F=[['all','الكل'],['active','سارية'],['exp','تنتهي خلال 90 يوم'],['new','جديدة'],['pending','قيد التوثيق'],['ended','منتهية'],['evicted','تم الإخلاء'],['debt','عليها رصيد']];
   $('#tenChips').innerHTML=F.map(f=>`<button class="chip" aria-pressed="${ui.tenF===f[0]}" data-f="${f[0]}">${f[1]}</button>`).join('');
@@ -592,9 +612,21 @@ function rTen(){
     if(ui.tenF==='active'&&s!=='active')return false; if(ui.tenF==='exp'&&!expSoon(t))return false;
     if(ui.tenF==='new'&&!(isNew(t)&&s!=='evicted'))return false; if(['pending','ended','evicted'].includes(ui.tenF)&&s!==ui.tenF)return false;
     if(ui.tenF==='debt'&&tenantOpen(t.id)<=0)return false;
-    if(q&&!((t.name||'')+' '+(t.contact||'')+' '+(t.phone||'')+' '+(t.unit||'')).includes(q))return false; return true}).sort((a,b)=>(a.no||0)-(b.no||0));
-  $('#tenRows').innerHTML=l.length?l.map(t=>{const o=tenantOpen(t.id);return `<tr data-id="${t.id}"><td class="n">${t.no||''}</td><td><span class="nm">${esc(t.name)}</span>${t.unit?'<span class="note">'+esc(t.unit)+'</span>':''}</td><td class="n">${fmt(t.rent)}</td><td class="n">${fmt(t.installment)}<span class="note">كل ${t.everyMonths||12} شهر</span></td><td class="n">${fd(t.nextDue)}</td><td class="n">${fd(t.start)}</td><td class="n">${fd(t.end)}</td><td>${cPill(t)}</td><td class="n">${o>0?'<b style="color:var(--bad)">'+fmt(o)+'</b>':'—'}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${tenants.length?'لا توجد عقود بهذا التصفية.':emptyMsg()}</td></tr>`;
-  $('#tenFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.rent||0),0))}</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.installment||0),0))}</td><td colspan="4"></td><td class="n">${fmt(l.reduce((a,t)=>a+tenantOpen(t.id),0))}</td></tr>`:'';
+    if(q&&!((t.name||'')+' '+(t.contact||'')+' '+(t.phone||'')+' '+(t.unit||'')).includes(q))return false; return true});
+  // month bar
+  const bs=$('#tenBasis');bs.value=ui.tenBasis;bs.onchange=()=>{ui.tenBasis=bs.value;saveUi();render()};
+  const ML=monthList();if(ui.tenMonth&&!ML.some(m=>m.ym===ui.tenMonth))ui.tenMonth='';
+  $('#monthChips').innerHTML=`<button class="chip" aria-pressed="${!ui.tenMonth}" data-m="">كل الأشهر</button>`+ML.map(m=>{const c=l.filter(t=>monthDate(t,m.ym)).length;return `<button class="chip" aria-pressed="${ui.tenMonth===m.ym}" data-m="${m.ym}"><bdi>${m.label}</bdi><small class="ct">${c}</small></button>`}).join('');
+  document.querySelectorAll('#monthChips .chip').forEach(c=>c.onclick=()=>{ui.tenMonth=c.dataset.m;saveUi();render()});
+  const MD=ui.tenMonth?new Map(l.map(t=>[t.id,monthDate(t,ui.tenMonth)])):null;
+  const L=ui.tenMonth?l.filter(t=>MD.get(t.id)).sort((a,b)=>MD.get(a.id).localeCompare(MD.get(b.id))||(a.no||0)-(b.no||0)):l.sort((a,b)=>(a.no||0)-(b.no||0));
+  const hl=k=>ui.tenMonth&&ui.tenBasis===k;
+  renderTenRows(L,MD,hl);
+}
+function renderTenRows(l,MD,hl){
+  const dueCell=t=>hl('due')?`<b>${fd(MD.get(t.id))}</b>`:fd(t.nextDue);
+  $('#tenRows').innerHTML=l.length?l.map(t=>{const o=tenantOpen(t.id);return `<tr data-id="${t.id}"><td class="n">${t.no||''}</td><td><span class="nm">${esc(t.name)}</span>${t.unit?'<span class="note">'+esc(t.unit)+'</span>':''}</td><td class="n">${fmt(t.rent)}</td><td class="n">${fmt(t.installment)}<span class="note">كل ${t.everyMonths||12} شهر</span></td><td class="n">${dueCell(t)}</td><td class="n">${hl('start')?'<b>'+fd(t.start)+'</b>':fd(t.start)}</td><td class="n">${hl('end')?'<b>'+fd(t.end)+'</b>':fd(t.end)}</td><td>${cPill(t)}</td><td class="n">${o>0?'<b style="color:var(--bad)">'+fmt(o)+'</b>':'—'}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${tenants.length?'لا توجد عقود بهذا التصفية.':emptyMsg()}</td></tr>`;
+  $('#tenFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.rent||0),0))}</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.installment||0),0))}</td><td colspan="4">${hl('due')?'<span class="note">إجمالي الدفعات المستحقة في الشهر المختار</span>':''}</td><td class="n">${fmt(l.reduce((a,t)=>a+tenantOpen(t.id),0))}</td></tr>`:'';
   document.querySelectorAll('#tenRows tr[data-id]').forEach(tr=>tr.onclick=()=>openTenant(tr.dataset.id));
 }
 
@@ -626,8 +658,8 @@ function openDue(id){
     <div><h4>سجل الإجراءات والتواصل</h4><div class="tl">${hist||'<div class="ev"><small>لا يوجد سجل</small></div>'}</div></div>
     <div><h4>الدفعات المستلمة</h4><div class="tl">${pays||'<div class="ev"><small>لا توجد دفعات مسجلة</small></div>'}</div></div>
     <div id="delBox"></div>`,
-    `${billOf(d)!=='sent'?`<button class="btn" id="dBill">${billOf(d)==='none'?'تسجيل الفاتورة':'تم الإرسال للعميل'}</button>`:''}<button class="btn pri" id="dPay">تسجيل دفعة</button><button class="btn" id="dStg">إجراء / نقل مرحلة</button><button class="btn" id="dEdit">تعديل</button>${t?'<button class="btn" id="dTen">ملف المستأجر</button>':''}<button class="btn ghost danger" id="dDel" style="margin-inline-start:auto">حذف</button>`);
-  $('#dPay').onclick=()=>openPay(id);if($('#dBill'))$('#dBill').onclick=()=>billForm(id);$('#dStg').onclick=()=>openStage(id);$('#dEdit').onclick=()=>dueForm(d);
+    `${billOf(d)!=='sent'?`<button class="btn" id="dBill">${billOf(d)==='none'?'تسجيل الفاتورة':'تم الإرسال للعميل'}</button>`:''}<button class="btn pri" id="dPay">تسجيل دفعة</button><button class="btn" id="dStg">إجراء / نقل مرحلة</button><button class="btn" id="dDoc">مستند المطالبة</button><button class="btn" id="dEdit">تعديل</button>${t?'<button class="btn" id="dTen">ملف المستأجر</button>':''}<button class="btn ghost danger" id="dDel" style="margin-inline-start:auto">حذف</button>`);
+  $('#dPay').onclick=()=>openPay(id);$('#dDoc').onclick=()=>openDoc(id);if($('#dBill'))$('#dBill').onclick=()=>billForm(id);$('#dStg').onclick=()=>openStage(id);$('#dEdit').onclick=()=>dueForm(d);
   if(t)$('#dTen').onclick=()=>openTenant(t.id);
   bindCopy();
   $('#dDel').onclick=()=>{$('#delBox').innerHTML=`<div class="confirm">حذف هذه المطالبة نهائياً؟ <button class="btn sm danger" id="dDelY">نعم، احذف</button><button class="btn sm" id="dDelN">إلغاء</button></div>`;$('#dDelN').onclick=()=>$('#delBox').innerHTML='';$('#dDelY').onclick=async()=>{await del('dues',id);close();toast('تم حذف المطالبة')}};
@@ -668,6 +700,112 @@ function openStage(id,preset){
     if(note)nd.notes=note;
     if(await put('dues',nd)){toast(moved?'تم النقل إلى '+st:'تم تسجيل المتابعة');openDue(id)}};
 }
+/* ---------- claim document (PDF / Word) ---------- */
+const CO={name:'شركة مجمع كرم مول التجاري',cr:'1122005677',vat:'310154341300003',addr:'المجمعة - حي المستقبل - طريق الملك خالد'};
+const ARD=n=>String(n).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);
+function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector('script[src="'+src+'"]'))return res();const e=document.createElement('script');e.src=src;e.onload=res;e.onerror=()=>rej(new Error('تعذّر تحميل المكتبة'));document.head.appendChild(e)})}
+function nextClaimNo(){const y=TODAY.slice(0,4);let mx=0;dues.forEach(d=>{const m=/^KM-(\d{4})-(\d+)$/.exec(d.claimNo||'');if(m&&m[1]===y)mx=Math.max(mx,+m[2])});return 'KM-'+y+'-'+String(mx+1).padStart(4,'0')}
+function claimData(d){
+  const t=tById(d.tenantId)||{};const amt=+d.amount||0,paid=paidOf(d),rem=remOf(d);
+  const base=Math.round(amt/1.15*100)/100,vat=Math.round((amt-base)*100)/100;
+  const payBy=iso(new Date(parse(TODAY).getTime()+7*864e5));
+  return {t,amt,paid,rem,base,vat,payBy,no:d.claimNo||'—',date:d.claimDate||TODAY,desc:'مستحقات إيجار — '+(d.period||''),inv:d.invNo||''};
+}
+function letterHTML(d){
+  const c=claimData(d),t=c.t;const C='#1f0b4a',G='#a87c3d';
+  const row=(k,v,b)=>`<tr><td style="padding:7px 12px;border:1px solid #ddd8e6;${b?'font-weight:700;background:#f4f1f9':''}">${k}</td><td style="padding:7px 12px;border:1px solid #ddd8e6;text-align:left;direction:ltr;font-variant-numeric:tabular-nums;${b?'font-weight:700;background:#f4f1f9':''}">${v}</td></tr>`;
+  return `<div dir="rtl" style="width:794px;min-height:1123px;box-sizing:border-box;padding:46px 56px 40px;background:#fff;color:#1a1426;font-family:'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif;font-size:14px;line-height:1.75;position:relative">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:20px">
+    <div><div style="font-size:19px;font-weight:700;color:${C}">${CO.name}</div>
+      <div style="font-size:12px;color:#555">سجل تجاري: ${CO.cr}<br>الرقم الضريبي: ${CO.vat}<br>${CO.addr}</div></div>
+    <img src="logo.png" style="width:120px">
+  </div>
+  <div style="height:3px;background:${G};margin:16px 0 22px"></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end">
+    <div style="font-size:24px;font-weight:700;color:${C}">مطالبة مالية</div>
+    <div style="font-size:12.5px;text-align:left;direction:rtl">رقم المطالبة: <b style="direction:ltr;unicode-bidi:embed">${esc(c.no)}</b><br>التاريخ: <b>${fd(c.date)}</b>${c.inv?'<br>رقم الفاتورة: <b>'+esc(c.inv)+'</b>':''}</div>
+  </div>
+  <div style="margin-top:22px">السادة / <b>${esc(d.tenantName)}</b>&nbsp;&nbsp;المحترمين${t.contact?'<br>عناية: '+esc(t.contact):''}${t.unit?'<br>المحل: '+esc(t.unit):''}</div>
+  <p style="margin:16px 0 6px">السلام عليكم ورحمة الله وبركاته،</p>
+  <p style="margin:0 0 14px">نفيدكم بأن المبالغ الموضحة أدناه مستحقة عليكم بموجب عقد الإيجار المبرم معكم لدى كرم مول، ونأمل منكم المبادرة بسدادها في موعد أقصاه <b>${fd(c.payBy)}</b>.</p>
+  <table style="width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px">
+    <tr style="background:${C};color:#fff"><th style="padding:8px 12px;text-align:right">البيان</th><th style="padding:8px 12px;text-align:right">تاريخ الاستحقاق</th><th style="padding:8px 12px;text-align:left">المبلغ (ر.س)</th></tr>
+    <tr><td style="padding:8px 12px;border:1px solid #ddd8e6">${esc(c.desc)}</td><td style="padding:8px 12px;border:1px solid #ddd8e6">${fd(d.dueDate)}</td><td style="padding:8px 12px;border:1px solid #ddd8e6;text-align:left;direction:ltr">${fmt(c.amt)}</td></tr>
+  </table>
+  <table style="width:55%;border-collapse:collapse;margin-right:auto;font-size:13.5px">
+    ${row('المبلغ قبل الضريبة',fmt(c.base))}${row('ضريبة القيمة المضافة 15%',fmt(c.vat))}${row('الإجمالي شامل الضريبة',fmt(c.amt),1)}${c.paid>0?row('المسدد',fmt(c.paid))+row('الرصيد المستحق',fmt(c.rem),1):''}
+  </table>
+  <p style="margin:22px 0 6px">نأمل في حال السداد تزويدنا بإشعار التحويل لإقفال المطالبة، شاكرين لكم حسن تعاونكم.</p>
+  <p style="margin:0">وتقبلوا وافر التحية والتقدير،،،</p>
+  <div style="display:flex;justify-content:space-between;margin-top:40px">
+    <div><b style="color:${C}">الإدارة المالية</b><br>${CO.name}<br><br>التوقيع: ....................</div>
+    <div style="text-align:center;color:#888">الختم</div>
+  </div>
+  <div style="position:absolute;bottom:26px;right:56px;left:56px;border-top:1px solid ${G};padding-top:8px;font-size:11px;color:#666;text-align:center">${CO.name} · س.ت ${CO.cr} · الرقم الضريبي ${CO.vat} · ${CO.addr}</div>
+</div>`;
+}
+async function openDoc(id){
+  let d=dues.find(x=>x.id===id);if(!d)return;
+  if(!d.claimNo&&canWrite!==false){const nd={...d,claimNo:nextClaimNo(),claimDate:TODAY,history:[...(d.history||[]),{date:TODAY,stage:'إصدار مستند مطالبة',note:''}]};nd.history[nd.history.length-1].note='رقم '+nd.claimNo;if(await put('dues',nd))d=dues.find(x=>x.id===id)||nd}
+  drawer('مستند المطالبة — '+esc(d.tenantName),`<div class="legend" style="display:block">معاينة المستند. لحفظه PDF اضغط «PDF / طباعة» واختر «حفظ كـ PDF» من نافذة الطباعة، أو حمّله Word للتعديل.</div>
+    <div style="overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fff"><div style="width:794px;transform:scale(.6);transform-origin:top right;height:${Math.round(1123*.6)}px">${letterHTML(d)}</div></div>`,
+    `<button class="btn pri" id="docPdf">PDF / طباعة</button><button class="btn" id="docWord">تحميل Word</button>${canWrite!==false&&billOf(d)!=='sent'?'<button class="btn" id="docSent">تم الإرسال للعميل</button>':''}<button class="btn ghost" id="docBack" style="margin-inline-start:auto">رجوع</button>`);
+  const fname='مطالبة '+(d.claimNo||'')+' - '+d.tenantName.slice(0,40);
+  $('#docBack').onclick=()=>openDue(id);
+  $('#docPdf').onclick=()=>printLetter(d,fname);
+  $('#docWord').onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='جارٍ التجهيز…';try{await exportWord(d,fname)}catch(err){toast(err.message||'تعذّر إنشاء ملف Word')}b.disabled=false;b.textContent='تحميل Word'};
+  if($('#docSent'))$('#docSent').onclick=async()=>{const cur=dues.find(x=>x.id===id);const nd={...cur,billing:'sent',invDate:cur.invDate||TODAY,history:[...(cur.history||[]),{date:TODAY,stage:'أُرسلت للعميل',note:'مستند المطالبة '+(cur.claimNo||'')}]};if(await put('dues',nd)){toast('تم تسجيل الإرسال');openDue(id)}};
+}
+function printLetter(d,fname){
+  const old=document.getElementById('printFrame');if(old)old.remove();
+  const f=document.createElement('iframe');f.id='printFrame';f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
+  const base=location.href.replace(/[#?].*$/,'').replace(/[^/]*$/,'');
+  const w=f.contentWindow;w.document.open();
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(fname)}</title><base href="${base}">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>@page{size:A4;margin:0}html,body{margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${letterHTML(d)}</body></html>`);
+  w.document.close();
+  const go=()=>{try{w.focus();w.print()}catch(e){toast('تعذّر فتح نافذة الطباعة')}};
+  const img=w.document.querySelector('img');
+  Promise.all([new Promise(r=>{if(!img||img.complete)r();else{img.onload=r;img.onerror=r}}),(w.document.fonts?w.document.fonts.ready:Promise.resolve()),new Promise(r=>setTimeout(r,400))]).then(go);
+}
+async function exportWord(d,fname){
+  await loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js');
+  const X=window.docx,c=claimData(d),t=c.t;const F='Arial',C='1F0B4A',G='A87C3D';
+  const logo=await (await fetch('logo.png')).arrayBuffer();
+  const R=(text,o={})=>new X.TextRun({text:String(text),font:F,rightToLeft:true,size:o.size||22,bold:!!o.bold,color:o.color});
+  const P=(runs,o={})=>new X.Paragraph({bidirectional:true,alignment:o.align||X.AlignmentType.LEFT,spacing:{after:o.after??120,before:o.before||0},children:Array.isArray(runs)?runs:[runs],border:o.border});
+  const cell=(text,o={})=>new X.TableCell({width:{size:o.w||3000,type:X.WidthType.DXA},shading:o.fill?{fill:o.fill,type:X.ShadingType.CLEAR,color:'auto'}:undefined,margins:{top:80,bottom:80,left:120,right:120},
+    children:[P(R(text,{bold:o.bold,color:o.color,size:21}),{after:0,align:o.num?X.AlignmentType.RIGHT:X.AlignmentType.LEFT})]});
+  const main=new X.Table({visuallyRightToLeft:true,width:{size:9000,type:X.WidthType.DXA},rows:[
+    new X.TableRow({tableHeader:true,children:[cell('البيان',{w:4600,fill:C,color:'FFFFFF',bold:1}),cell('تاريخ الاستحقاق',{w:2200,fill:C,color:'FFFFFF',bold:1}),cell('المبلغ (ر.س)',{w:2200,fill:C,color:'FFFFFF',bold:1,num:1})]}),
+    new X.TableRow({children:[cell(c.desc,{w:4600}),cell(fd(d.dueDate),{w:2200}),cell(fmt(c.amt),{w:2200,num:1})]})]});
+  const sumRows=[['المبلغ قبل الضريبة',fmt(c.base)],['ضريبة القيمة المضافة 15%',fmt(c.vat)],['الإجمالي شامل الضريبة',fmt(c.amt),1]];
+  if(c.paid>0)sumRows.push(['المسدد',fmt(c.paid)],['الرصيد المستحق',fmt(c.rem),1]);
+  const sum=new X.Table({visuallyRightToLeft:true,width:{size:5200,type:X.WidthType.DXA},rows:sumRows.map(r=>new X.TableRow({children:[cell(r[0],{w:3000,bold:r[2],fill:r[2]?'F4F1F9':undefined}),cell(r[1],{w:2200,bold:r[2],num:1,fill:r[2]?'F4F1F9':undefined})]}))});
+  const doc=new X.Document({styles:{default:{document:{run:{font:F,rightToLeft:true}}}},sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:900,bottom:900,left:1000,right:1000}}},
+    footers:{default:new X.Footer({children:[P(R(CO.name+' · س.ت '+CO.cr+' · الرقم الضريبي '+CO.vat+' · '+CO.addr,{size:16,color:'666666'}),{align:X.AlignmentType.CENTER,after:0})]})},
+    children:[
+      new X.Table({visuallyRightToLeft:true,width:{size:9000,type:X.WidthType.DXA},borders:X.TableBorders.NONE,rows:[new X.TableRow({children:[
+        new X.TableCell({width:{size:6000,type:X.WidthType.DXA},borders:{top:{style:'none'},bottom:{style:'none'},left:{style:'none'},right:{style:'none'}},children:[P(R(CO.name,{bold:1,size:30,color:C}),{after:40}),P(R('سجل تجاري: '+CO.cr,{size:19,color:'555555'}),{after:0}),P(R('الرقم الضريبي: '+CO.vat,{size:19,color:'555555'}),{after:0}),P(R(CO.addr,{size:19,color:'555555'}),{after:0})]}),
+        new X.TableCell({width:{size:3000,type:X.WidthType.DXA},borders:{top:{style:'none'},bottom:{style:'none'},left:{style:'none'},right:{style:'none'}},children:[new X.Paragraph({alignment:X.AlignmentType.LEFT,children:[new X.ImageRun({data:logo,transformation:{width:110,height:102}})]})]})]})]}),
+      P(R(''),{after:200,border:{bottom:{color:G,space:1,style:X.BorderStyle.SINGLE,size:18}}}),
+      P(R('مطالبة مالية',{bold:1,size:40,color:C}),{after:60}),
+      P([R('رقم المطالبة: ',{size:21}),R(c.no,{bold:1,size:21}),R('     التاريخ: ',{size:21}),R(fd(c.date),{bold:1,size:21})].concat(c.inv?[R('     رقم الفاتورة: ',{size:21}),R(c.inv,{bold:1,size:21})]:[]),{after:240}),
+      P([R('السادة / '),R(d.tenantName,{bold:1}),R('   المحترمين')],{after:40}),
+      ...(t.contact?[P(R('عناية: '+t.contact),{after:40})]:[]),
+      ...(t.unit?[P(R('المحل: '+t.unit),{after:40})]:[]),
+      P(R('السلام عليكم ورحمة الله وبركاته،'),{before:200}),
+      P([R('نفيدكم بأن المبالغ الموضحة أدناه مستحقة عليكم بموجب عقد الإيجار المبرم معكم لدى كرم مول، ونأمل منكم المبادرة بسدادها في موعد أقصاه '),R(fd(c.payBy),{bold:1}),R('.')],{after:200}),
+      main,P(R(''),{after:120}),sum,
+      P(R('نأمل في حال السداد تزويدنا بإشعار التحويل لإقفال المطالبة، شاكرين لكم حسن تعاونكم.'),{before:300}),
+      P(R('وتقبلوا وافر التحية والتقدير،،،'),{after:500}),
+      P(R('الإدارة المالية',{bold:1,color:C}),{after:0}),P(R(CO.name),{after:300}),P(R('التوقيع: ....................          الختم'))
+    ]}]});
+  const blob=await X.Packer.toBlob(doc);
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname+'.docx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+}
+
 function billForm(id){
   const d=dues.find(x=>x.id===id);if(!d)return;const cur=billOf(d);const nx=cur==='none'?'inv':'sent';
   drawer('حالة الفاتورة — '+esc(d.tenantName),`<div class="form">
