@@ -52,6 +52,21 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;backgroun
 .brand>div{display:flex;flex-direction:column;min-width:0}
 .brand .mark{width:38px;height:38px;object-fit:contain;flex:none}
 #projSel{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 8px;font-weight:600;color:var(--accent);max-width:200px}
+.bell{position:relative;padding:7px 10px}
+.bell .badge{position:absolute;top:-6px;inset-inline-end:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--bad);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.al{display:flex;flex-direction:column}
+.al .it{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;padding:10px 0;border-top:1px solid var(--line);align-items:start;cursor:pointer}
+.al .it:first-child{border-top:0}
+.al .it b{font-weight:500}
+.al .it small{display:block;color:var(--muted);font-size:12px}
+.al .it.new b::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--bad);margin-inline-start:6px;vertical-align:middle}
+.al .x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px}
+.rems{display:flex;flex-direction:column;gap:6px}
+.rem{display:flex;gap:8px;align-items:center;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.rem.done{opacity:.55;text-decoration:line-through}
+.rem .d{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px;white-space:nowrap}
+.rem .n{flex:1;min-width:0;overflow-wrap:anywhere}
+.np-dues.np-contracts [data-remadd],.np-dues.np-contracts [data-remdone],.np-dues.np-contracts [data-remdel]{display:none!important}
 .projcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center}
 .projcard img{width:44px;height:44px;object-fit:contain;flex:none}
 .projcard .t{flex:1;min-width:0}.projcard .t small{display:block;color:var(--muted);font-size:12px}
@@ -206,6 +221,7 @@ h4{margin:0 0 8px;font-size:13px;font-family:var(--f-display);font-weight:600}
       <div class="brand"><img src="mark.png" alt="" class="mark" id="brandMark"><div><h1 id="projTitle">إيجارات كرم مول</h1><span id="today"></span></div><select id="projSel" hidden aria-label="المشروع"></select></div>
       <div class="sync"><span class="dot" id="dot"></span><span id="syncTxt">جارٍ الاتصال…</span></div>
       <span class="who" id="whoBox" hidden><span id="whoTxt"></span><button class="btn sm ghost" id="btnLogout">خروج</button></span>
+      <button class="btn bell" id="btnBell" title="التنبيهات" aria-label="التنبيهات"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span class="badge" id="bellN" hidden>0</span></button>
       <button class="btn" id="btnShare" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-inline-end:4px"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M17 8v6M14 11h6"/></svg>المستخدمون</button>
       <button class="btn" id="btnExport" hidden>تصدير Excel</button>
       <button class="btn" id="btnNewDue">+ مطالبة</button>
@@ -315,7 +331,7 @@ const STATE={active:'ساري',pending:'قيد التوثيق',ended:'منتهي
 
 let who={owner:null,edit:null,write:null};
 function showRO(){if(sb){toast('لا تملك صلاحية التعديل — صلاحيتك: مشاهد');return}const n=$('#noDb');n.hidden=false;n.innerHTML='هذا العرض لا يسمح بالحفظ (صلاحيتك هنا: '+(who.owner?'مالك':who.edit?'محرر':who.write?'مساهم':'عرض فقط')+'). افتح رابط الصفحة كاملاً في المتصفح وأنت مسجّل بنفس حساب claude.ai المالك للصفحة، أو اطلب من المالك مشاركتها معك بصلاحية Contributor.';toast('لم يتم الحفظ — هذا العرض للقراءة فقط')}
-let db=null, canWrite=null, tenants=[], dues=[], ready={t:false,d:false};
+let db=null, canWrite=null, tenants=[], dues=[], reminders=[], REM_OK=false, ready={t:false,d:false};
 const ui={view:'dash',tenMonth:'',tenBasis:'due',dueF:'open',dueStage:'',dueBill:'',dueQ:'',upW:30,tenF:'all',tenQ:''};
 try{const s=JSON.parse(localStorage.getItem('krc-ui')||'{}');Object.assign(ui,s)}catch(e){}
 const saveUi=()=>{try{localStorage.setItem('krc-ui',JSON.stringify(ui))}catch(e){}};
@@ -391,9 +407,9 @@ async function put(col,obj){
   if(!db){toast('قاعدة البيانات غير متاحة في هذا العرض');return false}
   const {id,...raw}=obj;
   const rest=JSON.parse(JSON.stringify(raw,(k,v)=>v===null||v===undefined||(typeof v==='number'&&!isFinite(v))?'':v));
-  try{await db.collection(col).doc(id).set(rest);const arr=col==='dues'?dues:tenants;const i=arr.findIndex(x=>x.id===id);if(i>=0)arr[i]=obj;else arr.push(obj);render();return true}
+  try{await db.collection(col).doc(id).set(rest);const arr=col==='dues'?dues:col==='reminders'?reminders:tenants;const i=arr.findIndex(x=>x.id===id);if(i>=0)arr[i]=obj;else arr.push(obj);render();return true}
   catch(e){
-    if(e&&e.code==='unavailable'){try{await new Promise(r=>setTimeout(r,600+Math.random()*600));await db.collection(col).doc(id).set(rest);const arr=col==='dues'?dues:tenants;const i=arr.findIndex(x=>x.id===id);if(i>=0)arr[i]=obj;else arr.push(obj);render();return true}catch(e2){e=e2}}
+    if(e&&e.code==='unavailable'){try{await new Promise(r=>setTimeout(r,600+Math.random()*600));await db.collection(col).doc(id).set(rest);const arr=col==='dues'?dues:col==='reminders'?reminders:tenants;const i=arr.findIndex(x=>x.id===id);if(i>=0)arr[i]=obj;else arr.push(obj);render();return true}catch(e2){e=e2}}
     console.error('db write failed',col,id,e);
     if(e&&e.code==='invalid_argument'){showRO();return false}
     const m=(e&&e.message)||'';toast(/لا تملك/.test(m)?m.replace(/^.*?(لا تملك[^"]*).*$/,'$1'):'تعذّر الحفظ ('+((e&&e.code)||'خطأ')+(m?' — '+m:'')+')');return false}
@@ -505,13 +521,16 @@ async function startSession(session){
     delete:async()=>{const {error}=await sb.from(col).delete().eq('id',id);if(error)throw{code:'server',message:error.message}}})})};
   await loadAll(true);
   let t;const again=()=>{clearTimeout(t);t=setTimeout(()=>loadAll(false),400)};
-  const flt=CUR?{filter:'project=eq.'+CUR}:{};sb.channel('rent-db').on('postgres_changes',{event:'*',schema:'public',table:'tenants',...flt},again).on('postgres_changes',{event:'*',schema:'public',table:'dues',...flt},again).subscribe();
+  const flt=CUR?{filter:'project=eq.'+CUR}:{};sb.channel('rent-db').on('postgres_changes',{event:'*',schema:'public',table:'tenants',...flt},again).on('postgres_changes',{event:'*',schema:'public',table:'dues',...flt},again).on('postgres_changes',{event:'*',schema:'public',table:'reminders',...flt},again).subscribe();
   setInterval(()=>{if(!document.hidden)loadAll(false)},120000);
+  $('#btnBell').onclick=()=>openAlerts();
+  setTimeout(()=>{const n=buildAlerts().filter(a=>a.sev==='bad'&&!alertSeen(a)).length;if(n)toast('لديك '+n+' تنبيه عاجل — اضغط الجرس')},900);
   if(window.XLSX){const b=$('#btnExport');b.hidden=false;b.onclick=()=>exportXlsx(null)}
 }
 async function fetchAll(t,allProjects){let out=[],from=0;for(;;){let q=sb.from(t).select(allProjects&&CUR?'id,data,project':'id,data');if(CUR&&!allProjects)q=q.eq('project',CUR);const {data,error}=await q.range(from,from+999);if(error)throw error;out=out.concat(data.map(r=>({...r.data,id:r.id,...(r.project&&allProjects?{project:r.project}:{})})));if(data.length<1000)break;from+=1000}return out}
 async function loadAll(first){
   try{const [a,b]=await Promise.all([fetchAll('tenants'),fetchAll('dues')]);tenants=a;dues=b;ready.t=ready.d=true;
+    try{reminders=await fetchAll('reminders');REM_OK=true}catch(e){REM_OK=false;reminders=[]}
     $('#dot').classList.add('on');$('#syncTxt').textContent='متصل — '+new Date().toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});render()}
   catch(e){$('#dot').classList.remove('on');$('#syncTxt').textContent='تعذّر الاتصال';if(first)toast('تعذّر تحميل البيانات: '+(e.message||e))}
 }
@@ -603,8 +622,90 @@ async function openAudit(filter){
     if(error){toast(error.message);btn.disabled=false;return}toast('تم الاسترجاع');await loadAll(false);openAudit(filter)});
 }
 
+/* ---------- alerts & reminders ---------- */
+const ALS_KEY='krc-alerts',ALC_KEY='krc-alert-cfg';
+function alStore(){try{return JSON.parse(localStorage.getItem(ALS_KEY)||'{}')}catch(e){return {}}}
+function alSave(o){try{localStorage.setItem(ALS_KEY,JSON.stringify(o))}catch(e){}}
+function alCfg(){let c={};try{c=JSON.parse(localStorage.getItem(ALC_KEY)||'{}')}catch(e){}return {exp:+c.exp||90,due:+c.due||7,disc:+c.disc||30}}
+const alertSeen=a=>!!(alStore().seen||{})[a.key];
+const alertHidden=a=>!!(alStore().hidden||{})[a.key];
+function buildAlerts(){
+  const C=alCfg(),out=[];const add=(o)=>out.push(o);
+  const inDays=d=>d?days(TODAY,d):null;
+  tenants.forEach(t=>{const st=contractState(t);if(st==='evicted')return;
+    if(t.end&&st==='active'){const n=inDays(t.end);if(n>=0&&n<=C.exp)add({key:'exp:'+t.id+':'+t.end,sev:n<=30?'bad':'warn',tag:'انتهاء عقد',title:t.name,sub:'ينتهي العقد '+fd(t.end)+' — بعد '+n+' يوم',date:t.end,go:()=>openTenant(t.id)})}
+    if(st==='ended'&&t.end&&days(t.end,TODAY)<=60)add({key:'ended:'+t.id+':'+t.end,sev:'bad',tag:'عقد منتهي',title:t.name,sub:'انتهى '+fd(t.end)+' ولم يُجدد',date:t.end,go:()=>openTenant(t.id)});
+    if(t.nextDue&&instAt(t,t.nextDue)>0&&!(t.end&&t.nextDue>t.end)){const n=inDays(t.nextDue);const issued=dues.some(d=>d.tenantId===t.id&&d.dueDate===t.nextDue);
+      if(!issued&&n<=C.due)add({key:'pay:'+t.id+':'+t.nextDue,sev:n<0?'bad':'warn',tag:n<0?'دفعة لم تُصدر':'دفعة قادمة',title:t.name,sub:'دفعة '+fmt(instAt(t,t.nextDue))+' — '+(n<0?'فات موعدها منذ '+(-n)+' يوم':n===0?'تستحق اليوم':'تستحق بعد '+n+' يوم ('+fd(t.nextDue)+')'),date:t.nextDue,go:()=>openTenant(t.id)})}
+    (t.amendments||[]).forEach(a=>{if(a.to&&a.to>=TODAY){const n=inDays(a.to);if(n<=C.disc)add({key:'amd:'+t.id+':'+a.id,sev:'info',tag:'نهاية تعديل مؤقت',title:t.name,sub:(AMK[a.kind]||'تعديل')+' ينتهي '+fd(a.to)+' ويرجع الإيجار لقيمته',date:a.to,go:()=>openTenant(t.id)})}});
+  });
+  dues.forEach(d=>{const s=dueStatus(d);if(s==='paid')return;
+    if(s==='up'){const n=inDays(d.dueDate);if(n<=C.due)add({key:'due:'+d.id+':'+d.dueDate,sev:'warn',tag:'مطالبة تستحق',title:d.tenantName,sub:fmt(remOf(d))+' تستحق '+fd(d.dueDate),date:d.dueDate,go:()=>openDue(d.id)})}
+    else if(stageOver(d))add({key:'stg:'+d.id+':'+d.stage+':'+d.stageDate,sev:'bad',tag:'تجاوز مرحلة',title:d.tenantName,sub:d.stage+' منذ '+stageAge(d)+' يوم (المحدد '+stageInfo(d.stage).d+') — متبقي '+fmt(remOf(d)),date:d.stageDate,go:()=>openDue(d.id)});
+    if(billOf(d)==='none'&&inDays(d.dueDate)<=C.due)add({key:'bill:'+d.id,sev:'warn',tag:'غير مفوترة',title:d.tenantName,sub:(d.period||'')+' — لم تصدر فاتورتها',date:d.dueDate,go:()=>openDue(d.id)});
+  });
+  reminders.forEach(r=>{if(r.done)return;const n=inDays(r.date);if(n>7)return;
+    add({key:'rem:'+r.id+':'+r.date,sev:n<=0?'bad':'info',tag:n<0?'تذكير متأخر':n===0?'تذكير اليوم':'تذكير قادم',title:r.title||'تذكير',sub:(r.note||'')+' — '+fd(r.date)+(r.by?' · '+r.by.split('@')[0]:''),date:r.date,rem:r.id,go:()=>r.refType==='due'?openDue(r.refId):r.refType==='tenant'?openTenant(r.refId):openAlerts('rem')})});
+  const rank={bad:0,warn:1,info:2};return out.sort((a,b)=>rank[a.sev]-rank[b.sev]||String(a.date).localeCompare(String(b.date)));
+}
+function updateBell(){const n=buildAlerts().filter(a=>!alertSeen(a)&&!alertHidden(a)).length;const b=$('#bellN');if(!b)return;b.hidden=!n;b.textContent=n>99?'99+':n}
+function openAlerts(tab){
+  tab=tab||'all';const all=buildAlerts();const st=alStore();
+  const vis=all.filter(a=>!alertHidden(a)&&(tab==='all'||(tab==='bad'&&a.sev==='bad')||(tab==='rem'&&a.rem)));
+  const hiddenN=all.filter(alertHidden).length;
+  drawer('التنبيهات',`<div class="chips">${[['all','الكل ('+all.filter(a=>!alertHidden(a)).length+')'],['bad','عاجل ('+all.filter(a=>a.sev==='bad'&&!alertHidden(a)).length+')'],['rem','التذكيرات']].map(([k,l])=>`<button class="chip" aria-pressed="${k===tab}" data-at="${k}">${l}</button>`).join('')}</div>
+    <div class="al">${vis.length?vis.map((a,i)=>`<div class="it ${alertSeen(a)?'':'new'}" data-i="${i}"><span class="pill ${a.sev==='bad'?'p-late':a.sev==='warn'?'p-due':'p-up'}">${esc(a.tag)}</span><div><b>${esc(a.title)}</b><small>${esc(a.sub)}</small></div><div>${a.rem&&(PERMS.edit_dues||PERMS.edit_contracts)?`<button class="x" data-rdone="${a.rem}" title="تم">✓ تم</button>`:''}<button class="x" data-hide="${i}" title="إخفاء">إخفاء</button></div></div>`).join(''):'<div class="empty">لا توجد تنبيهات — كل شيء تحت السيطرة.</div>'}</div>
+    ${hiddenN?`<div class="legend" style="display:block">${hiddenN} تنبيه مخفي · <a href="#" id="alUnhide">إظهارها</a></div>`:''}`,
+    `${REM_OK&&(PERMS.edit_dues||PERMS.edit_contracts)?'<button class="btn pri" id="alNew">+ تذكير جديد</button>':''}<button class="btn" id="alCfg">إعدادات التنبيهات</button>`);
+  // mark as seen
+  const seen=st.seen||{};all.forEach(a=>seen[a.key]=1);st.seen=seen;alSave(st);updateBell();
+  document.querySelectorAll('[data-at]').forEach(c=>c.onclick=()=>openAlerts(c.dataset.at));
+  document.querySelectorAll('.al .it').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;vis[+el.dataset.i].go()});
+  document.querySelectorAll('[data-hide]').forEach(b=>b.onclick=()=>{const a=vis[+b.dataset.hide];const s2=alStore();s2.hidden=s2.hidden||{};s2.hidden[a.key]=1;alSave(s2);openAlerts(tab)});
+  document.querySelectorAll('[data-rdone]').forEach(b=>b.onclick=async()=>{await remToggle(b.dataset.rdone);openAlerts(tab)});
+  if($('#alUnhide'))$('#alUnhide').onclick=e=>{e.preventDefault();const s2=alStore();s2.hidden={};alSave(s2);openAlerts(tab)};
+  if($('#alNew'))$('#alNew').onclick=()=>remForm(null,null,'',()=>openAlerts('rem'));
+  $('#alCfg').onclick=()=>alertCfgForm();
+}
+function alertCfgForm(){const c=alCfg();
+  drawer('إعدادات التنبيهات',`<div class="form">
+    <label>تنبيه انتهاء العقود قبل<select id="cExp">${[30,60,90,120,180].map(n=>`<option ${n===c.exp?'selected':''} value="${n}">${n} يوم</option>`).join('')}</select></label>
+    <label>تنبيه الدفعات والمطالبات قبل<select id="cDue">${[3,7,14,30].map(n=>`<option ${n===c.due?'selected':''} value="${n}">${n} يوم</option>`).join('')}</select></label>
+    <label>تنبيه نهاية الخصم المؤقت قبل<select id="cDisc">${[7,14,30,60].map(n=>`<option ${n===c.disc?'selected':''} value="${n}">${n} يوم</option>`).join('')}</select></label></div>
+    <div class="legend" style="display:block">الإعدادات خاصة بك على هذا الجهاز.</div>`,`<button class="btn pri" id="cSave">حفظ</button><button class="btn" id="cBack">رجوع</button>`);
+  $('#cBack').onclick=()=>openAlerts();
+  $('#cSave').onclick=()=>{try{localStorage.setItem(ALC_KEY,JSON.stringify({exp:+val('cExp'),due:+val('cDue'),disc:+val('cDisc')}))}catch(e){}toast('تم حفظ الإعدادات');updateBell();openAlerts()};
+}
+function remList(refType,refId,back){
+  if(!REM_OK)return '';
+  const rs=reminders.filter(r=>r.refType===refType&&r.refId===refId).sort((a,b)=>(a.done-b.done)||a.date.localeCompare(b.date));
+  return `<div><h4 style="display:flex;align-items:center;gap:8px">التذكيرات<button class="btn sm" data-remadd style="margin-inline-start:auto">+ تذكير</button></h4><div class="rems">${rs.length?rs.map(r=>`<div class="rem ${r.done?'done':''}"><span class="d">${fd(r.date)}</span><span class="n">${esc(r.note||'')}</span><button class="btn sm ghost" data-remdone="${r.id}">${r.done?'إرجاع':'✓ تم'}</button><button class="btn sm ghost danger" data-remdel="${r.id}">حذف</button></div>`).join(''):'<div class="empty" style="padding:6px 0">لا توجد تذكيرات.</div>'}</div></div>`;
+}
+function bindRem(refType,refId,title,back){
+  const a=document.querySelector('[data-remadd]');if(a)a.onclick=()=>remForm(refType,refId,title,back);
+  document.querySelectorAll('[data-remdone]').forEach(b=>b.onclick=async()=>{await remToggle(b.dataset.remdone);back()});
+  document.querySelectorAll('[data-remdel]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('reminders').delete().eq('id',b.dataset.remdel);if(error){toast(error.message);return}reminders=reminders.filter(r=>r.id!==b.dataset.remdel);toast('تم حذف التذكير');render();back()});
+}
+async function remToggle(id){const r=reminders.find(x=>x.id===id);if(!r)return;const nr={...r,done:!r.done,doneAt:TODAY,doneBy:MY_EMAIL};if(await put('reminders',nr))toast(nr.done?'تم إنهاء التذكير':'أُعيد التذكير')}
+function remForm(refType,refId,title,back){
+  const opts=tenants.slice().sort((a,b)=>a.name.localeCompare(b.name,'ar')).map(t=>`<option value="t:${t.id}">${esc(t.name)}</option>`).join('');
+  drawer('تذكير جديد',`<div class="form">
+    ${refType?`<label class="full">مرتبط بـ<input disabled value="${esc(title)}"></label>`:`<label class="full">مرتبط بـ (اختياري)<select id="rRef"><option value="">— تذكير عام —</option>${opts}</select></label>`}
+    <label>التاريخ<input id="rDate" type="date" value="${iso(new Date(parse(TODAY).getTime()+864e5))}"></label>
+    <label>&nbsp;<span class="chips">${[[1,'غداً'],[7,'بعد أسبوع'],[30,'بعد شهر']].map(([n,l])=>`<button type="button" class="chip" data-rd="${n}">${l}</button>`).join('')}</span></label>
+    <label class="full">التذكير<textarea id="rNote" placeholder="مثال: متابعة وعد التحويل مع المسؤول"></textarea></label></div>`,
+    `<button class="btn pri" id="rSave">حفظ التذكير</button><button class="btn" id="rBack">رجوع</button>`);
+  document.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>{$('#rDate').value=iso(new Date(parse(TODAY).getTime()+(+b.dataset.rd)*864e5))});
+  $('#rBack').onclick=back;
+  $('#rSave').onclick=async()=>{const note=val('rNote');if(!note){toast('اكتب نص التذكير');return}
+    let rt=refType,ri=refId,tt=title;if(!rt){const v=val('rRef');if(v){rt='tenant';ri=v.slice(2);tt=(tById(ri)||{}).name||''}}
+    const r={id:uid('r'),refType:rt||'',refId:ri||'',title:tt||'تذكير عام',date:val('rDate')||TODAY,note,by:MY_EMAIL||'',created:new Date().toISOString(),done:false};
+    if(await put('reminders',r)){toast('تم حفظ التذكير');back()}};
+}
+
 /* ---------- render ---------- */
 function render(){
+  try{updateBell()}catch(e){}
   document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===ui.view));
   document.querySelectorAll('section.view').forEach(s=>s.hidden=s.id!=='v-'+ui.view);
   const open=dues.filter(d=>{const s=dueStatus(d);return s!=='paid'&&s!=='up'});
@@ -643,6 +744,7 @@ function rDash(){
   upcomingList(7).forEach(t=>items.push({w:t.nextDue<TODAY?2:1,h:t.nextDue<TODAY?'<span class="pill p-due">لم تُصدر</span>':'<span class="pill p-up">هذا الأسبوع</span>',t:t.name,s:`دفعة ${fmt(instAt(t,t.nextDue))} تستحق ${fd(t.nextDue)}`,a:()=>openTenant(t.id)}));
   tenants.filter(t=>expSoon(t)&&days(TODAY,t.end)<=30).forEach(t=>items.push({w:1,h:'<span class="pill p-due">تجديد</span>',t:t.name,s:'العقد ينتهي '+fd(t.end),a:()=>openTenant(t.id)}));
   tenants.filter(t=>t.state==='pending').forEach(t=>items.push({w:0,h:'<span class="pill p-up">توثيق</span>',t:t.name,s:'عقد قيد التوثيق',a:()=>openTenant(t.id)}));
+  reminders.filter(r=>!r.done&&r.date<=TODAY).forEach(r=>items.push({w:3,h:'<span class="pill p-late">تذكير</span>',t:r.title||'تذكير',s:(r.note||'')+' — '+fd(r.date),a:()=>r.refType==='due'?openDue(r.refId):r.refType==='tenant'?openTenant(r.refId):openAlerts('rem')}));
   items.sort((a,b)=>b.w-a.w);
   $('#todoCount').textContent=items.length?items.length+' بند':'';
   const td=$('#todo');td.innerHTML=items.length?'':`<div class="empty">${dues.length||tenants.length?'لا توجد إجراءات عاجلة.':emptyMsg()}</div>`;
@@ -800,11 +902,12 @@ function openDue(id){
     ${stageSteps(d.stage)}
     <div><h4>سجل الإجراءات والتواصل</h4><div class="tl">${hist||'<div class="ev"><small>لا يوجد سجل</small></div>'}</div></div>
     <div><h4>الدفعات المستلمة</h4><div class="tl">${pays||'<div class="ev"><small>لا توجد دفعات مسجلة</small></div>'}</div></div>
+    ${remList('due',d.id)}
     <div id="delBox"></div>`,
     `${billOf(d)!=='sent'?`<button class="btn" id="dBill">${billOf(d)==='none'?'تسجيل الفاتورة':'تم الإرسال للعميل'}</button>`:''}<button class="btn pri" id="dPay">تسجيل دفعة</button><button class="btn" id="dStg">إجراء / نقل مرحلة</button><button class="btn" id="dDoc">مستند المطالبة</button><button class="btn" id="dDisc">${discOf(d)?'تعديل الخصم':'خصم'}</button><button class="btn" id="dEdit">تعديل</button>${t?'<button class="btn" id="dTen">ملف المستأجر</button>':''}<button class="btn ghost danger" id="dDel" style="margin-inline-start:auto">حذف</button>`);
   $('#dPay').onclick=()=>openPay(id);$('#dDoc').onclick=()=>openDoc(id);$('#dDisc').onclick=()=>discForm(id);if($('#dBill'))$('#dBill').onclick=()=>billForm(id);$('#dStg').onclick=()=>openStage(id);$('#dEdit').onclick=()=>dueForm(d);
   if(t)$('#dTen').onclick=()=>openTenant(t.id);
-  bindCopy();
+  bindCopy();bindRem('due',d.id,d.tenantName+' — '+(d.period||''),()=>openDue(id));
   $('#dDel').onclick=()=>{$('#delBox').innerHTML=`<div class="confirm">حذف هذه المطالبة نهائياً؟ <button class="btn sm danger" id="dDelY">نعم، احذف</button><button class="btn sm" id="dDelN">إلغاء</button></div>`;$('#dDelN').onclick=()=>$('#delBox').innerHTML='';$('#dDelY').onclick=async()=>{await del('dues',id);close();toast('تم حذف المطالبة')}};
 }
 function bindCopy(){document.querySelectorAll('[data-copy]').forEach(e=>e.onclick=()=>{const v=e.dataset.copy;Promise.resolve().then(()=>navigator.clipboard.writeText(v)).then(()=>toast('تم نسخ الرقم'),()=>{const r=document.createRange();r.selectNodeContents(e);const s=getSelection();s.removeAllRanges();s.addRange(r)})})}
@@ -1051,13 +1154,14 @@ function openTenant(id){
     <dt>البريد</dt><dd>${esc(t.email||'—')}</dd><dt>مهمة ClickUp</dt><dd>${t.link?`<a href="${esc(t.link)}" target="_blank" rel="noopener">فتح المهمة</a>`:'—'}</dd>
     ${t.notes?`<dt>ملاحظات</dt><dd>${esc(t.notes)}</dd>`:''}</dl>
     <div><h4 style="display:flex;align-items:center;gap:8px">تعديلات العقد (خصم / زيادة)<button class="btn sm" id="tAmend" style="margin-inline-start:auto">+ إضافة تعديل</button></h4>${amendList(t)}</div>
+    ${remList('tenant',t.id)}
     <div><h4>المطالبات (${ds.length})</h4>${ds.length?`<div class="tbl"><table><thead><tr><th>الفترة</th><th>الاستحقاق</th><th>المتبقي</th><th>الحالة</th><th>الفوترة</th><th>المرحلة</th></tr></thead><tbody>${ds.map(d=>`<tr data-d="${d.id}"><td>${esc(d.period||'')}</td><td class="n">${fd(d.dueDate)}</td><td class="n">${fmt(remOf(d))}</td><td>${pill(dueStatus(d))}</td><td>${bPill(d)}</td><td>${dueStatus(d)==='paid'?'—':esc(d.stage||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">لا توجد مطالبات</div>'}</div>
     <div id="delBox"></div>`,
     `${t.nextDue&&+t.installment?'<button class="btn pri" id="tIssue">إصدار مطالبة الدفعة القادمة</button>':''}<button class="btn" id="tEdit">تعديل العقد</button><button class="btn" id="tDue">مطالبة يدوية</button><button class="btn ghost danger" id="tDel" style="margin-inline-start:auto">حذف</button>`);
   document.querySelectorAll('[data-d]').forEach(r=>r.onclick=()=>openDue(r.dataset.d));
   bindCopy();
   if($('#tIssue'))$('#tIssue').onclick=async()=>{await issue(id,$('#tIssue'));openTenant(id)};
-  $('#tEdit').onclick=()=>tenantForm(t);
+  $('#tEdit').onclick=()=>tenantForm(t);bindRem('tenant',t.id,t.name,()=>openTenant(id));
   $('#tAmend').onclick=()=>amendForm(id);
   document.querySelectorAll('[data-amdel]').forEach(b=>b.onclick=async()=>{const cur=tById(id);const nt={...cur,amendments:(cur.amendments||[]).filter(a=>a.id!==b.dataset.amdel)};if(await put('tenants',nt)){toast('تم حذف التعديل');openTenant(id)}});
   $('#tDue').onclick=()=>{dueForm(null);$('#fTen').value=id;$('#fAmt').value=instAt(t,t.nextDue||TODAY)||''};
