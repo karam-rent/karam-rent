@@ -178,7 +178,7 @@ h4{margin:0 0 8px;font-size:13px;font-family:var(--f-display);font-weight:600}
 .auth .msg{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
 .auth .msg.err{background:var(--bad-soft);color:var(--bad)} .auth .msg.ok{background:var(--ok-soft);color:var(--ok)}
 .who{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
-.ro #btnNewDue,.ro #btnNewTenant,.ro [data-pay],.ro [data-stg],.ro [data-issue],.ro #dPay,.ro #dStg,.ro #dEdit,.ro #dDel,.ro #dBill,.ro #tIssue,.ro #tEdit,.ro #tDue,.ro #tDel{display:none!important}
+.ro #btnNewDue,.ro #btnNewTenant,.ro [data-pay],.ro [data-stg],.ro [data-issue],.ro #dPay,.ro #dStg,.ro #dEdit,.ro #dDel,.ro #dBill,.ro #tIssue,.ro #tEdit,.ro #tDue,.ro #tDel,.ro #dDisc,.ro #tAmend,.ro [data-amdel]{display:none!important}
 @media (prefers-reduced-motion:no-preference){.drawer{animation:sl .18s ease-out}@keyframes sl{from{transform:translateX(-30px);opacity:.6}}}
 </style>
 
@@ -320,7 +320,27 @@ $('#today').textContent='شركة مجمع كرم مول التجاري · '+fd(
 
 const tById=id=>tenants.find(t=>t.id===id);
 const paidOf=d=>(d.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
-const remOf=d=>Math.max(0,(+d.amount||0)-paidOf(d));
+const discOf=d=>d.discount?(+d.discount.amount||0):0;
+const netOf=d=>Math.max(0,(+d.amount||0)-discOf(d));
+const remOf=d=>Math.max(0,netOf(d)-paidOf(d));
+/* contract amendments: chronological; temporary ones (with "to") apply only inside their window */
+const r2=n=>Math.round(n*100)/100;
+function termsAt(t,date,skipId){
+  let st={rent:+t.rent||0,inst:+t.installment||0};
+  const am=(t.amendments||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)||(a.created||'').localeCompare(b.created||''));
+  for(const a of am){ if(a.date>date)break; if(a.id===skipId||(a.to&&date>a.to))continue; st=applyAm(a,st,t) }
+  return st;
+}
+function applyAm(a,st,t){
+  const v=+a.value||0;let rent=st.rent;
+  if(a.kind==='set')rent=v; else{const delta=a.mode==='percent'?st.rent*v/100:v;rent=a.kind==='discount'?st.rent-delta:st.rent+delta}
+  rent=Math.max(0,r2(rent));
+  const inst=st.rent>0?r2(st.inst*rent/st.rent):r2(rent*(+t.everyMonths||12)/12);
+  return {rent,inst};
+}
+const curRent=t=>termsAt(t,TODAY).rent;
+const instAt=(t,date)=>termsAt(t,date||TODAY).inst;
+const hasAm=t=>(t.amendments||[]).length>0;
 function dueStatus(d){
   const paid=paidOf(d);
   if(d.closed||remOf(d)<=0.5) return 'paid';
@@ -479,13 +499,13 @@ function emptyMsg(){return db&&ready.t&&ready.d?'لا توجد بيانات بع
 
 function upcomingList(w){
   const lim=iso(new Date(parse(TODAY).getTime()+w*864e5));
-  return tenants.filter(t=>contractState(t)!=='evicted'&&t.nextDue&&+t.installment>0&&t.nextDue<=lim&&!(t.end&&t.nextDue>t.end)).sort((a,b)=>a.nextDue.localeCompare(b.nextDue));
+  return tenants.filter(t=>contractState(t)!=='evicted'&&t.nextDue&&instAt(t,t.nextDue)>0&&t.nextDue<=lim&&!(t.end&&t.nextDue>t.end)).sort((a,b)=>a.nextDue.localeCompare(b.nextDue));
 }
 
 function rDash(){
   const open=dues.filter(d=>{const s=dueStatus(d);return s!=='paid'&&s!=='up'});
   const late=open.filter(d=>dueStatus(d)==='late');
-  const up30=upcomingList(30); const upAmt=up30.reduce((a,t)=>a+(+t.installment||0),0);
+  const up30=upcomingList(30); const upAmt=up30.reduce((a,t)=>a+instAt(t,t.nextDue),0);
   const exp=tenants.filter(expSoon); const nw=tenants.filter(t=>isNew(t)&&contractState(t)!=='evicted');
   const sum=a=>a.reduce((x,d)=>x+remOf(d),0);
   const unb=dues.filter(d=>billOf(d)==='none'&&dueStatus(d)!=='paid');
@@ -502,7 +522,7 @@ function rDash(){
   const items=[];
   open.filter(stageOver).forEach(d=>items.push({w:3,h:`<span class="pill p-late">تجاوز المرحلة</span>`,t:d.tenantName,s:`${d.stage} منذ ${stageAge(d)} يوم (المحدد ${stageInfo(d.stage).d}) — متبقي ${fmt(remOf(d))}`,a:()=>openDue(d.id)}));
   unb.filter(d=>days(TODAY,d.dueDate)<=7).forEach(d=>items.push({w:2,h:'<span class="pill p-mute">غير مفوترة</span>',t:d.tenantName,s:`${d.period||''} — ${fmt(remOf(d))} تستحق ${fd(d.dueDate)} ولم تصدر فاتورتها`,a:()=>openDue(d.id)}));
-  upcomingList(7).forEach(t=>items.push({w:t.nextDue<TODAY?2:1,h:t.nextDue<TODAY?'<span class="pill p-due">لم تُصدر</span>':'<span class="pill p-up">هذا الأسبوع</span>',t:t.name,s:`دفعة ${fmt(t.installment)} تستحق ${fd(t.nextDue)}`,a:()=>openTenant(t.id)}));
+  upcomingList(7).forEach(t=>items.push({w:t.nextDue<TODAY?2:1,h:t.nextDue<TODAY?'<span class="pill p-due">لم تُصدر</span>':'<span class="pill p-up">هذا الأسبوع</span>',t:t.name,s:`دفعة ${fmt(instAt(t,t.nextDue))} تستحق ${fd(t.nextDue)}`,a:()=>openTenant(t.id)}));
   tenants.filter(t=>expSoon(t)&&days(TODAY,t.end)<=30).forEach(t=>items.push({w:1,h:'<span class="pill p-due">تجديد</span>',t:t.name,s:'العقد ينتهي '+fd(t.end),a:()=>openTenant(t.id)}));
   tenants.filter(t=>t.state==='pending').forEach(t=>items.push({w:0,h:'<span class="pill p-up">توثيق</span>',t:t.name,s:'عقد قيد التوثيق',a:()=>openTenant(t.id)}));
   items.sort((a,b)=>b.w-a.w);
@@ -524,7 +544,7 @@ function rDash(){
   const now=parse(TODAY);const ms=[];for(let i=0;i<6;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1);ms.push({y:d.getFullYear(),m:d.getMonth(),v:0})}
   const endLim=iso(new Date(now.getFullYear(),now.getMonth()+6,1));
   tenants.forEach(t=>{if(contractState(t)==='evicted'||!t.nextDue||!(+t.installment))return;let d=t.nextDue<TODAY?TODAY:t.nextDue;let nd=t.nextDue;let guard=0;
-    while(nd<endLim&&guard++<40){if(t.end&&nd>t.end)break;const dd=nd<TODAY?TODAY:nd;const p=parse(dd);const b=ms.find(x=>x.y===p.getFullYear()&&x.m===p.getMonth());if(b)b.v+=+t.installment;nd=addM(nd,+t.everyMonths||12)}});
+    while(nd<endLim&&guard++<40){if(t.end&&nd>t.end)break;const dd=nd<TODAY?TODAY:nd;const p=parse(dd);const b=ms.find(x=>x.y===p.getFullYear()&&x.m===p.getMonth());if(b)b.v+=instAt(t,nd);nd=addM(nd,+t.everyMonths||12)}});
   const mx3=Math.max(1,...ms.map(x=>x.v));
   $('#fcCols').innerHTML=ms.map(x=>`<div class="c"><span>${fmtK(x.v)}</span><div class="b" style="height:${x.v/mx3*120}px"></div></div>`).join('');
   $('#fcX').innerHTML=ms.map(x=>`<span>${MONTHS[x.m]}</span>`).join('');
@@ -553,10 +573,10 @@ function rDues(){
   const qi=$('#dueQ');if(qi.value!==ui.dueQ&&document.activeElement!==qi)qi.value=ui.dueQ;
   const rows=dueRowsFiltered();
   $('#dueRows').innerHTML=rows.length?rows.map(d=>{const s=dueStatus(d);const si=stageInfo(d.stage);const ov=stageOver(d)&&s!=='paid'&&s!=='up';
-    return `<tr data-id="${d.id}"><td><span class="nm">${esc(d.tenantName)}</span></td><td class="n">${esc(d.period||'')}</td><td class="n">${fd(d.dueDate)}</td><td class="n">${fmt(d.amount)}</td><td class="n">${fmt(paidOf(d))}</td><td class="n"><b>${fmt(remOf(d))}</b></td><td>${pill(s)}</td><td>${bPill(d)}${d.invNo?'<span class="note num">'+esc(d.invNo)+'</span>':''}</td>
+    return `<tr data-id="${d.id}"><td><span class="nm">${esc(d.tenantName)}</span></td><td class="n">${esc(d.period||'')}</td><td class="n">${fd(d.dueDate)}</td><td class="n">${fmt(netOf(d))}${discOf(d)?'<span class="note">بعد خصم '+fmt(discOf(d))+'</span>':''}</td><td class="n">${fmt(paidOf(d))}</td><td class="n"><b>${fmt(remOf(d))}</b></td><td>${pill(s)}</td><td>${bPill(d)}${d.invNo?'<span class="note num">'+esc(d.invNo)+'</span>':''}</td>
     <td>${s==='paid'?'—':`<div>${esc(d.stage||'')}</div><div class="sla ${ov?'over':''}">${stageAge(d)} يوم${si&&si.d!=null?' / '+si.d:''}</div>`}</td><td><span class="note">${esc(lastNote(d))}</span></td>
     <td class="n"><button class="btn sm" data-pay="${d.id}">دفعة</button> <button class="btn sm" data-stg="${d.id}">إجراء</button></td></tr>`}).join(''):`<tr><td colspan="11" class="empty">${dues.length?'لا توجد مطالبات بهذا التصفية.':emptyMsg()}</td></tr>`;
-  $('#dueFoot').innerHTML=rows.length?`<tr><td colspan="3">الإجمالي (${rows.length})</td><td class="n">${fmt(rows.reduce((a,d)=>a+(+d.amount||0),0))}</td><td class="n">${fmt(rows.reduce((a,d)=>a+paidOf(d),0))}</td><td class="n">${fmt(rows.reduce((a,d)=>a+remOf(d),0))}</td><td colspan="5"></td></tr>`:'';
+  $('#dueFoot').innerHTML=rows.length?`<tr><td colspan="3">الإجمالي (${rows.length})</td><td class="n">${fmt(rows.reduce((a,d)=>a+netOf(d),0))}</td><td class="n">${fmt(rows.reduce((a,d)=>a+paidOf(d),0))}</td><td class="n">${fmt(rows.reduce((a,d)=>a+remOf(d),0))}</td><td colspan="5"></td></tr>`:'';
   document.querySelectorAll('#dueRows tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('button'))return;openDue(tr.dataset.id)});
   document.querySelectorAll('#dueRows [data-pay]').forEach(b=>b.onclick=()=>openPay(b.dataset.pay));
   document.querySelectorAll('#dueRows [data-stg]').forEach(b=>b.onclick=()=>openStage(b.dataset.stg));
@@ -580,17 +600,17 @@ function rUp(){
   $('#upChips').innerHTML=W.map(w=>`<button class="chip" aria-pressed="${ui.upW===w[0]}" data-w="${w[0]}">${w[1]}</button>`).join('');
   document.querySelectorAll('#upChips .chip').forEach(c=>c.onclick=()=>{ui.upW=+c.dataset.w;saveUi();render()});
   const l=upcomingList(ui.upW);
-  $('#upRows').innerHTML=l.length?l.map(t=>{const dd=days(TODAY,t.nextDue);return `<tr data-id="${t.id}"><td><span class="nm">${esc(t.name)}</span></td><td class="n">${fd(t.nextDue)}</td><td class="n"><b>${fmt(t.installment)}</b></td><td class="n">كل ${t.everyMonths||12} شهر</td>
+  $('#upRows').innerHTML=l.length?l.map(t=>{const dd=days(TODAY,t.nextDue);return `<tr data-id="${t.id}"><td><span class="nm">${esc(t.name)}</span></td><td class="n">${fd(t.nextDue)}</td><td class="n"><b>${fmt(instAt(t,t.nextDue))}</b>${instAt(t,t.nextDue)!==(+t.installment||0)?'<span class="note">بعد تعديل العقد</span>':''}</td><td class="n">كل ${t.everyMonths||12} شهر</td>
     <td>${dd<0?`<span class="pill p-late">فات ${-dd} يوم — لم تُصدر</span>`:dd===0?'<span class="pill p-due">اليوم</span>':`<span class="pill p-up">بعد ${dd} يوم</span>`}</td><td class="n">${fd(t.end)}</td><td class="n">${esc(t.contact||'')}${t.phone?'<br><small class="num">'+esc(t.phone)+'</small>':''}</td>
     <td class="n"><button class="btn sm pri" data-issue="${t.id}">إصدار مطالبة</button></td></tr>`}).join(''):`<tr><td colspan="8" class="empty">${tenants.length?'لا توجد دفعات مجدولة في هذه الفترة.':emptyMsg()}</td></tr>`;
-  $('#upFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.installment||0),0))}</td><td colspan="5"></td></tr>`:'';
+  $('#upFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+instAt(t,t.nextDue),0))}</td><td colspan="5"></td></tr>`:'';
   document.querySelectorAll('#upRows tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('button'))return;openTenant(tr.dataset.id)});
   document.querySelectorAll('#upRows [data-issue]').forEach(b=>b.onclick=()=>issue(b.dataset.issue,b));
 }
 async function issue(tid,btn){
   const t=tById(tid);if(!t)return;if(btn)btn.disabled=true;
   const p=parse(t.nextDue);
-  const d={id:uid('d'),tenantId:t.id,tenantName:t.name,period:MONTHS[p.getMonth()]+' '+p.getFullYear(),amount:+t.installment,dueDate:t.nextDue,stage:'المطالبة',stageDate:TODAY,payments:[],notes:'',closed:false,billing:'none',invNo:'',invDate:'',history:[{date:TODAY,stage:'المطالبة',note:'إنشاء مطالبة الدفعة — بانتظار الفوترة'}]};
+  const d={id:uid('d'),tenantId:t.id,tenantName:t.name,period:MONTHS[p.getMonth()]+' '+p.getFullYear(),amount:instAt(t,t.nextDue),dueDate:t.nextDue,stage:'المطالبة',stageDate:TODAY,payments:[],notes:'',closed:false,billing:'none',invNo:'',invDate:'',history:[{date:TODAY,stage:'المطالبة',note:'إنشاء مطالبة الدفعة — بانتظار الفوترة'}]};
   if(await put('dues',d)){const {id,...r}=t;await put('tenants',{...t,nextDue:addM(t.nextDue,+t.everyMonths||12)});toast('تم إنشاء المطالبة — سجّل رقم الفاتورة عند إصدارها')}
   else if(btn)btn.disabled=false;
 }
@@ -601,7 +621,7 @@ function nextPay(t){const ds=issuedOpen(t);return ds[0]&&(!t.nextDue||ds[0]<t.ne
 function payInMonth(t,ym){ // installment date of this tenant inside month ym (issued claim first, then contract schedule)
   if(contractState(t)==='evicted')return null;
   const iss=dues.find(d=>d.tenantId===t.id&&!d.closed&&d.dueDate&&d.dueDate.slice(0,7)===ym);if(iss)return iss.dueDate;
-  if(!t.nextDue||!(+t.installment))return null;
+  if(!t.nextDue||!(+t.installment||hasAm(t)))return null;
   let nd=t.nextDue,g=0;const step=+t.everyMonths||12;
   while(nd.slice(0,7)<ym&&g++<60)nd=addM(nd,step);
   if(nd.slice(0,7)!==ym)return null; if(t.end&&nd>t.end)return null; return nd}
@@ -629,8 +649,9 @@ function rTen(){
 }
 function renderTenRows(l,MD,hl){
   const dueCell=t=>hl('due')?`<b>${fd(MD.get(t.id))}</b>`:fd(nextPay(t));
-  $('#tenRows').innerHTML=l.length?l.map(t=>{const o=tenantOpen(t.id);return `<tr data-id="${t.id}"><td class="n">${t.no||''}</td><td><span class="nm">${esc(t.name)}</span>${t.unit?'<span class="note">'+esc(t.unit)+'</span>':''}</td><td class="n">${fmt(t.rent)}</td><td class="n">${fmt(t.installment)}<span class="note">كل ${t.everyMonths||12} شهر</span></td><td class="n">${dueCell(t)}</td><td class="n">${hl('start')?'<b>'+fd(t.start)+'</b>':fd(t.start)}</td><td class="n">${hl('end')?'<b>'+fd(t.end)+'</b>':fd(t.end)}</td><td>${cPill(t)}</td><td class="n">${o>0?'<b style="color:var(--bad)">'+fmt(o)+'</b>':'—'}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${tenants.length?'لا توجد عقود بهذا التصفية.':emptyMsg()}</td></tr>`;
-  $('#tenFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.rent||0),0))}</td><td class="n">${fmt(l.reduce((a,t)=>a+(+t.installment||0),0))}</td><td colspan="4">${hl('due')?'<span class="note">إجمالي الدفعات المستحقة في الشهر المختار</span>':''}</td><td class="n">${fmt(l.reduce((a,t)=>a+tenantOpen(t.id),0))}</td></tr>`:'';
+  const instFor=t=>{const dt=hl('due')?MD.get(t.id):(nextPay(t)||TODAY);const iss=dues.find(d=>d.tenantId===t.id&&d.dueDate===dt&&!d.closed);return iss?netOf(iss):instAt(t,dt)};
+  $('#tenRows').innerHTML=l.length?l.map(t=>{const o=tenantOpen(t.id);return `<tr data-id="${t.id}"><td class="n">${t.no||''}</td><td><span class="nm">${esc(t.name)}</span>${t.unit?'<span class="note">'+esc(t.unit)+'</span>':''}</td><td class="n">${fmt(curRent(t))}${hasAm(t)&&curRent(t)!==(+t.rent||0)?'<span class="note">معدّل (الأصلي '+fmt(t.rent)+')</span>':''}</td><td class="n">${fmt(instFor(t))}<span class="note">كل ${t.everyMonths||12} شهر</span></td><td class="n">${dueCell(t)}</td><td class="n">${hl('start')?'<b>'+fd(t.start)+'</b>':fd(t.start)}</td><td class="n">${hl('end')?'<b>'+fd(t.end)+'</b>':fd(t.end)}</td><td>${cPill(t)}</td><td class="n">${o>0?'<b style="color:var(--bad)">'+fmt(o)+'</b>':'—'}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${tenants.length?'لا توجد عقود بهذا التصفية.':emptyMsg()}</td></tr>`;
+  $('#tenFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+curRent(t),0))}</td><td class="n">${fmt(l.reduce((a,t)=>a+instFor(t),0))}</td><td colspan="4">${hl('due')?'<span class="note">إجمالي الدفعات المستحقة في الشهر المختار</span>':''}</td><td class="n">${fmt(l.reduce((a,t)=>a+tenantOpen(t.id),0))}</td></tr>`:'';
   document.querySelectorAll('#tenRows tr[data-id]').forEach(tr=>tr.onclick=()=>openTenant(tr.dataset.id));
 }
 
@@ -654,7 +675,7 @@ function openDue(id){
   drawer(esc(d.tenantName),`
     <div style="display:flex;gap:8px;flex-wrap:wrap">${pill(s)} ${s!=='paid'&&stageOver(d)?'<span class="pill p-late">تجاوز مدة المرحلة</span>':''}</div>
     <dl class="dl"><dt>الفترة</dt><dd>${esc(d.period||'')}</dd><dt>تاريخ الاستحقاق</dt><dd>${fd(d.dueDate)} <small>(${d.dueDate<=TODAY?'منذ '+days(d.dueDate,TODAY)+' يوم':'بعد '+days(TODAY,d.dueDate)+' يوم'})</small></dd>
-    <dt>المبلغ</dt><dd class="num">${fmt(d.amount)}</dd><dt>المدفوع</dt><dd class="num">${fmt(paidOf(d))}</dd><dt>المتبقي</dt><dd class="num"><b>${fmt(remOf(d))}</b></dd>
+    <dt>المبلغ</dt><dd class="num">${fmt(d.amount)}</dd>${discOf(d)?`<dt>الخصم</dt><dd class="num">− ${fmt(discOf(d))} <small>${d.discount.mode==='percent'?'('+d.discount.value+'%) ':''}${esc(d.discount.reason||'')}</small></dd><dt>الصافي</dt><dd class="num"><b>${fmt(netOf(d))}</b></dd>`:''}<dt>المدفوع</dt><dd class="num">${fmt(paidOf(d))}</dd><dt>المتبقي</dt><dd class="num"><b>${fmt(remOf(d))}</b></dd>
     <dt>الفوترة</dt><dd>${bPill(d)}${d.invNo?' رقم <span class="num">'+esc(d.invNo)+'</span>':''}${d.invDate?' بتاريخ '+fd(d.invDate):''}</dd>
     <dt>المرحلة الحالية</dt><dd>${esc(d.stage||'')} — منذ ${fd(d.stageDate)} (${stageAge(d)} يوم)</dd>
     ${t?`<dt>التواصل</dt><dd>${esc(t.contact||'—')} ${t.phone?'· <span class="copy num" data-copy="'+esc(t.phone)+'">'+esc(t.phone)+'</span>':''}</dd>`:''}</dl>
@@ -662,8 +683,8 @@ function openDue(id){
     <div><h4>سجل الإجراءات والتواصل</h4><div class="tl">${hist||'<div class="ev"><small>لا يوجد سجل</small></div>'}</div></div>
     <div><h4>الدفعات المستلمة</h4><div class="tl">${pays||'<div class="ev"><small>لا توجد دفعات مسجلة</small></div>'}</div></div>
     <div id="delBox"></div>`,
-    `${billOf(d)!=='sent'?`<button class="btn" id="dBill">${billOf(d)==='none'?'تسجيل الفاتورة':'تم الإرسال للعميل'}</button>`:''}<button class="btn pri" id="dPay">تسجيل دفعة</button><button class="btn" id="dStg">إجراء / نقل مرحلة</button><button class="btn" id="dDoc">مستند المطالبة</button><button class="btn" id="dEdit">تعديل</button>${t?'<button class="btn" id="dTen">ملف المستأجر</button>':''}<button class="btn ghost danger" id="dDel" style="margin-inline-start:auto">حذف</button>`);
-  $('#dPay').onclick=()=>openPay(id);$('#dDoc').onclick=()=>openDoc(id);if($('#dBill'))$('#dBill').onclick=()=>billForm(id);$('#dStg').onclick=()=>openStage(id);$('#dEdit').onclick=()=>dueForm(d);
+    `${billOf(d)!=='sent'?`<button class="btn" id="dBill">${billOf(d)==='none'?'تسجيل الفاتورة':'تم الإرسال للعميل'}</button>`:''}<button class="btn pri" id="dPay">تسجيل دفعة</button><button class="btn" id="dStg">إجراء / نقل مرحلة</button><button class="btn" id="dDoc">مستند المطالبة</button><button class="btn" id="dDisc">${discOf(d)?'تعديل الخصم':'خصم'}</button><button class="btn" id="dEdit">تعديل</button>${t?'<button class="btn" id="dTen">ملف المستأجر</button>':''}<button class="btn ghost danger" id="dDel" style="margin-inline-start:auto">حذف</button>`);
+  $('#dPay').onclick=()=>openPay(id);$('#dDoc').onclick=()=>openDoc(id);$('#dDisc').onclick=()=>discForm(id);if($('#dBill'))$('#dBill').onclick=()=>billForm(id);$('#dStg').onclick=()=>openStage(id);$('#dEdit').onclick=()=>dueForm(d);
   if(t)$('#dTen').onclick=()=>openTenant(t.id);
   bindCopy();
   $('#dDel').onclick=()=>{$('#delBox').innerHTML=`<div class="confirm">حذف هذه المطالبة نهائياً؟ <button class="btn sm danger" id="dDelY">نعم، احذف</button><button class="btn sm" id="dDelN">إلغاء</button></div>`;$('#dDelN').onclick=()=>$('#delBox').innerHTML='';$('#dDelY').onclick=async()=>{await del('dues',id);close();toast('تم حذف المطالبة')}};
@@ -710,10 +731,10 @@ const ARD=n=>String(n).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);
 function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector('script[src="'+src+'"]'))return res();const e=document.createElement('script');e.src=src;e.onload=res;e.onerror=()=>rej(new Error('تعذّر تحميل المكتبة'));document.head.appendChild(e)})}
 function nextClaimNo(){const y=TODAY.slice(0,4);let mx=0;dues.forEach(d=>{const m=/^KM-(\d{4})-(\d+)$/.exec(d.claimNo||'');if(m&&m[1]===y)mx=Math.max(mx,+m[2])});return 'KM-'+y+'-'+String(mx+1).padStart(4,'0')}
 function claimData(d){
-  const t=tById(d.tenantId)||{};const amt=+d.amount||0,paid=paidOf(d),rem=remOf(d);
-  const base=Math.round(amt/1.15*100)/100,vat=Math.round((amt-base)*100)/100;
+  const t=tById(d.tenantId)||{};const gross=+d.amount||0,disc=discOf(d),amt=netOf(d),paid=paidOf(d),rem=remOf(d);
+  const base=r2(amt/1.15),vat=r2(amt-base);
   const payBy=iso(new Date(parse(TODAY).getTime()+7*864e5));
-  return {t,amt,paid,rem,base,vat,payBy,no:d.claimNo||'—',date:d.claimDate||TODAY,desc:'مستحقات إيجار — '+(d.period||''),inv:d.invNo||''};
+  return {t,gross,disc,discWhy:d.discount?(d.discount.reason||''):'',discPct:d.discount&&d.discount.mode==='percent'?d.discount.value:null,amt,paid,rem,base,vat,payBy,no:d.claimNo||'—',date:d.claimDate||TODAY,desc:'مستحقات إيجار — '+(d.period||''),inv:d.invNo||''};
 }
 function letterHTML(d){
   const c=claimData(d),t=c.t;const C='#1f0b4a',G='#a87c3d';
@@ -734,10 +755,11 @@ function letterHTML(d){
   <p style="margin:0 0 14px">نفيدكم بأن المبالغ الموضحة أدناه مستحقة عليكم بموجب عقد الإيجار المبرم معكم لدى كرم مول، ونأمل منكم المبادرة بسدادها في موعد أقصاه <b>${fd(c.payBy)}</b>.</p>
   <table style="width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px">
     <tr style="background:${C};color:#fff"><th style="padding:8px 12px;text-align:right">البيان</th><th style="padding:8px 12px;text-align:right">تاريخ الاستحقاق</th><th style="padding:8px 12px;text-align:left">المبلغ (ر.س)</th></tr>
-    <tr><td style="padding:8px 12px;border:1px solid #ddd8e6">${esc(c.desc)}</td><td style="padding:8px 12px;border:1px solid #ddd8e6">${fd(d.dueDate)}</td><td style="padding:8px 12px;border:1px solid #ddd8e6;text-align:left;direction:ltr">${fmt(c.amt)}</td></tr>
+    <tr><td style="padding:8px 12px;border:1px solid #ddd8e6">${esc(c.desc)}</td><td style="padding:8px 12px;border:1px solid #ddd8e6">${fd(d.dueDate)}</td><td style="padding:8px 12px;border:1px solid #ddd8e6;text-align:left;direction:ltr">${fmt(c.gross)}</td></tr>
+    ${c.disc?`<tr><td style="padding:8px 12px;border:1px solid #ddd8e6">خصم${c.discPct!=null?' ('+c.discPct+'%)':''}${c.discWhy?' — '+esc(c.discWhy):''}</td><td style="padding:8px 12px;border:1px solid #ddd8e6"></td><td style="padding:8px 12px;border:1px solid #ddd8e6;text-align:left;direction:ltr">(${fmt(c.disc)})</td></tr>`:''}
   </table>
   <table style="width:55%;border-collapse:collapse;margin-right:auto;font-size:13.5px">
-    ${row('المبلغ قبل الضريبة',fmt(c.base))}${row('ضريبة القيمة المضافة 15%',fmt(c.vat))}${row('الإجمالي شامل الضريبة',fmt(c.amt),1)}${c.paid>0?row('المسدد',fmt(c.paid))+row('الرصيد المستحق',fmt(c.rem),1):''}
+    ${c.disc?row('الصافي بعد الخصم',fmt(c.amt)):''}${row('المبلغ قبل الضريبة',fmt(c.base))}${row('ضريبة القيمة المضافة 15%',fmt(c.vat))}${row('الإجمالي شامل الضريبة',fmt(c.amt),1)}${c.paid>0?row('المسدد',fmt(c.paid))+row('الرصيد المستحق',fmt(c.rem),1):''}
   </table>
   <p style="margin:22px 0 6px">نأمل في حال السداد تزويدنا بإشعار التحويل لإقفال المطالبة، شاكرين لكم حسن تعاونكم.</p>
   <p style="margin:0">وتقبلوا وافر التحية والتقدير،،،</p>
@@ -783,8 +805,9 @@ async function exportWord(d,fname){
     children:[P(R(text,{bold:o.bold,color:o.color,size:21}),{after:0,align:o.num?X.AlignmentType.RIGHT:X.AlignmentType.LEFT})]});
   const main=new X.Table({visuallyRightToLeft:true,width:{size:9000,type:X.WidthType.DXA},rows:[
     new X.TableRow({tableHeader:true,children:[cell('البيان',{w:4600,fill:C,color:'FFFFFF',bold:1}),cell('تاريخ الاستحقاق',{w:2200,fill:C,color:'FFFFFF',bold:1}),cell('المبلغ (ر.س)',{w:2200,fill:C,color:'FFFFFF',bold:1,num:1})]}),
-    new X.TableRow({children:[cell(c.desc,{w:4600}),cell(fd(d.dueDate),{w:2200}),cell(fmt(c.amt),{w:2200,num:1})]})]});
-  const sumRows=[['المبلغ قبل الضريبة',fmt(c.base)],['ضريبة القيمة المضافة 15%',fmt(c.vat)],['الإجمالي شامل الضريبة',fmt(c.amt),1]];
+    new X.TableRow({children:[cell(c.desc,{w:4600}),cell(fd(d.dueDate),{w:2200}),cell(fmt(c.gross),{w:2200,num:1})]})]
+    .concat(c.disc?[new X.TableRow({children:[cell('خصم'+(c.discPct!=null?' ('+c.discPct+'%)':'')+(c.discWhy?' — '+c.discWhy:''),{w:4600}),cell('',{w:2200}),cell('('+fmt(c.disc)+')',{w:2200,num:1})]})]:[])});
+  const sumRows=(c.disc?[['الصافي بعد الخصم',fmt(c.amt)]]:[]).concat([['المبلغ قبل الضريبة',fmt(c.base)],['ضريبة القيمة المضافة 15%',fmt(c.vat)],['الإجمالي شامل الضريبة',fmt(c.amt),1]]);
   if(c.paid>0)sumRows.push(['المسدد',fmt(c.paid)],['الرصيد المستحق',fmt(c.rem),1]);
   const sum=new X.Table({visuallyRightToLeft:true,width:{size:5200,type:X.WidthType.DXA},rows:sumRows.map(r=>new X.TableRow({children:[cell(r[0],{w:3000,bold:r[2],fill:r[2]?'F4F1F9':undefined}),cell(r[1],{w:2200,bold:r[2],num:1,fill:r[2]?'F4F1F9':undefined})]}))});
   const doc=new X.Document({styles:{default:{document:{run:{font:F,rightToLeft:true}}}},sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:900,bottom:900,left:1000,right:1000}}},
@@ -808,6 +831,57 @@ async function exportWord(d,fname){
     ]}]});
   const blob=await X.Packer.toBlob(doc);
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname+'.docx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+}
+
+function discForm(id){
+  const d=dues.find(x=>x.id===id);if(!d)return;const ds=d.discount||{mode:'amount',value:'',reason:'',date:TODAY};
+  drawer('خصم على المطالبة — '+esc(d.tenantName),`<div class="form">
+    <label>نوع الخصم<select id="xMode"><option value="amount" ${ds.mode!=='percent'?'selected':''}>مبلغ (ر.س)</option><option value="percent" ${ds.mode==='percent'?'selected':''}>نسبة %</option></select></label>
+    <label>القيمة<input id="xVal" type="number" step="0.01" min="0" value="${ds.value}"></label>
+    <label>تاريخ الخصم<input id="xDate" type="date" value="${ds.date||TODAY}"></label>
+    <label>مبلغ المطالبة<input disabled value="${fmt(d.amount)}"></label>
+    <label class="full">سبب الخصم / رقم الموافقة<input id="xWhy" value="${esc(ds.reason||'')}" placeholder="مثال: خصم موافق عليه من الإدارة — فترة الصيانة"></label></div>
+    <div class="panel" style="padding:12px"><dl class="dl"><dt>المبلغ</dt><dd class="num">${fmt(d.amount)}</dd><dt>الخصم</dt><dd class="num" id="xAmt">—</dd><dt>الصافي بعد الخصم</dt><dd class="num"><b id="xNet">—</b></dd></dl></div>`,
+    `<button class="btn pri" id="xSave">حفظ الخصم</button>${d.discount?'<button class="btn danger" id="xDel">إلغاء الخصم</button>':''}<button class="btn" id="xCancel">رجوع</button>`);
+  const calc=()=>{const v=+val('xVal')||0;const a=val('xMode')==='percent'?r2((+d.amount||0)*v/100):r2(v);$('#xAmt').textContent=fmt(a);$('#xNet').textContent=fmt(Math.max(0,(+d.amount||0)-a));return a};
+  $('#xVal').oninput=calc;$('#xMode').onchange=calc;calc();
+  $('#xCancel').onclick=()=>openDue(id);
+  $('#xSave').onclick=async()=>{const a=calc();if(!(a>0)){toast('أدخل قيمة الخصم');return}if(a>(+d.amount||0)){toast('الخصم أكبر من مبلغ المطالبة');return}
+    const disc={mode:val('xMode'),value:+val('xVal'),amount:a,reason:val('xWhy'),date:val('xDate')||TODAY};
+    const nd={...d,discount:disc,history:[...(d.history||[]),{date:disc.date,stage:'خصم',note:`خصم ${fmt(a)}${disc.mode==='percent'?' ('+disc.value+'%)':''} — الصافي ${fmt((+d.amount||0)-a)}${disc.reason?' — '+disc.reason:''}`}]};
+    if(remOf(nd)<=0.5)nd.closed=true;
+    if(await put('dues',nd)){toast('تم حفظ الخصم');openDue(id)}};
+  if($('#xDel'))$('#xDel').onclick=async()=>{const nd={...d,history:[...(d.history||[]),{date:TODAY,stage:'إلغاء خصم',note:'إلغاء خصم '+fmt(discOf(d))}]};delete nd.discount;if(nd.closed&&remOf(nd)>0.5)nd.closed=false;if(await put('dues',nd)){toast('تم إلغاء الخصم');openDue(id)}};
+}
+const AMK={discount:'خصم',increase:'زيادة',set:'قيمة إيجارية جديدة'};
+function amendForm(tid){
+  const t=tById(tid);if(!t)return;
+  drawer('تعديل على العقد — '+esc(t.name),`<div class="form">
+    <label>نوع التعديل<select id="aKind"><option value="discount">خصم على الإيجار</option><option value="increase">زيادة على الإيجار</option><option value="set">قيمة إيجارية جديدة</option></select></label>
+    <label id="aModeL">الطريقة<select id="aMode"><option value="percent">نسبة %</option><option value="amount">مبلغ سنوي (ر.س)</option></select></label>
+    <label><span id="aValLbl">القيمة</span><input id="aVal" type="number" step="0.01" min="0"></label>
+    <label>تاريخ السريان<input id="aFrom" type="date" value="${TODAY}"></label>
+    <label>حتى تاريخ (اختياري)<input id="aTo" type="date"></label>
+    <label class="full">السبب / رقم الملحق<input id="aWhy" placeholder="مثال: ملحق عقد رقم 2 — خصم فترة الصيانة"></label></div>
+    <div class="legend" style="display:block;line-height:1.8">يُطبَّق التعديل على كل دفعة تستحق من تاريخ السريان. اترك «حتى تاريخ» فارغاً للتعديل الدائم، أو حدده لخصم مؤقت يرجع بعده الإيجار لقيمته.</div>
+    <div class="panel" style="padding:12px"><dl class="dl"><dt>الإيجار السنوي الحالي</dt><dd class="num" id="aOld">—</dd><dt>بعد التعديل</dt><dd class="num"><b id="aNew">—</b></dd><dt>قيمة الدفعة بعد التعديل</dt><dd class="num"><b id="aInst">—</b></dd></dl></div>`,
+    `<button class="btn pri" id="aSave">حفظ التعديل</button><button class="btn" id="aCancel">رجوع</button>`);
+  const build=()=>({id:uid('a'),kind:val('aKind'),mode:val('aKind')==='set'?'amount':val('aMode'),value:+val('aVal')||0,date:val('aFrom')||TODAY,to:val('aTo')||'',reason:val('aWhy'),created:new Date().toISOString(),by:MY_EMAIL||''});
+  const calc=()=>{const k=val('aKind');$('#aModeL').hidden=k==='set';$('#aValLbl').textContent=k==='set'?'الإيجار السنوي الجديد':val('aMode')==='percent'?'النسبة %':'المبلغ السنوي';
+    const a=build();const before=termsAt(t,a.date);const after=applyAm(a,before,t);
+    $('#aOld').textContent=fmt(before.rent)+' (دفعة '+fmt(before.inst)+')';$('#aNew').textContent=fmt(after.rent);$('#aInst').textContent=fmt(after.inst);return a};
+  ['aKind','aMode','aVal','aFrom'].forEach(i=>{$('#'+i).oninput=calc;$('#'+i).onchange=calc});calc();
+  $('#aCancel').onclick=()=>openTenant(tid);
+  $('#aSave').onclick=async()=>{const a=calc();if(!(a.value>0)){toast('أدخل القيمة');return}if(a.to&&a.to<a.date){toast('«حتى تاريخ» قبل تاريخ السريان');return}
+    const nt={...t,amendments:[...(t.amendments||[]),a]};if(await put('tenants',nt)){toast('تم حفظ التعديل على العقد');openTenant(tid)}};
+}
+function amendList(t){
+  const am=(t.amendments||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  if(!am.length)return '<div class="empty" style="padding:8px 0">لا توجد تعديلات — القيمة الإيجارية حسب العقد الأصلي.</div>';
+  let st={rent:+t.rent||0,inst:+t.installment||0};
+  return `<div class="tbl"><table><thead><tr><th>السريان</th><th>التعديل</th><th>الإيجار بعده</th><th>الدفعة</th><th>السبب</th><th></th></tr></thead><tbody>${am.map(a=>{const before=termsAt(t,a.date,a.id);const af=applyAm(a,before,t);
+    const desc=a.kind==='set'?'قيمة جديدة':AMK[a.kind]+' '+(a.mode==='percent'?a.value+'%':fmt(a.value)+' ر.س');
+    return `<tr style="cursor:default"><td class="n">${fd(a.date)}${a.to?'<span class="note">حتى '+fd(a.to)+'</span>':''}</td><td><span class="pill ${a.kind==='discount'?'p-paid':a.kind==='increase'?'p-due':'p-up'}">${desc}</span></td><td class="n">${fmt(af.rent)}</td><td class="n">${fmt(af.inst)}</td><td><span class="note" style="max-width:160px">${esc(a.reason||'')}</span></td><td class="n"><button class="btn sm ghost danger" data-amdel="${a.id}">حذف</button></td></tr>`}).join('')}</tbody></table></div>`;
 }
 
 function billForm(id){
@@ -838,7 +912,7 @@ function dueForm(d){
     <label class="full">ملاحظات<textarea id="fNote">${esc(d.notes||'')}</textarea></label>
     ${!isNew?`<label class="full" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="fClosed" style="width:auto" ${d.closed?'checked':''}> إغلاق المطالبة (تسوية / إعفاء)</label>`:''}</div>`,
     `<button class="btn pri" id="fSave">حفظ</button><button class="btn" id="fCancel">إلغاء</button>`);
-  $('#fTen').onchange=()=>{const t=tById(val('fTen'));if(t&&!val('fAmt'))$('#fAmt').value=t.installment||''};
+  $('#fTen').onchange=()=>{const t=tById(val('fTen'));if(t&&!val('fAmt'))$('#fAmt').value=instAt(t,t.nextDue||TODAY)||''};
   $('#fCancel').onclick=()=>isNew?close():openDue(d.id);
   $('#fSave').onclick=async()=>{const t=tById(val('fTen'));if(!t){toast('اختر المستأجر');return}if(!(+val('fAmt')>0)){toast('أدخل المبلغ');return}
     const st=val('fStg');const nd={...d,tenantId:t.id,tenantName:t.name,period:val('fPer'),amount:+val('fAmt'),dueDate:val('fDue')||TODAY,stage:st,notes:val('fNote'),billing:val('fBill'),invNo:val('fInv'),invDate:val('fBill')==='none'?'':(d.invDate||TODAY)};
@@ -851,12 +925,13 @@ function openTenant(id){
   const t=tById(id);if(!t)return;current={t:'ten',id};
   const ds=dues.filter(d=>d.tenantId===id).sort((a,b)=>b.dueDate.localeCompare(a.dueDate));
   drawer(esc(t.name),`<div style="display:flex;gap:8px;flex-wrap:wrap">${cPill(t)}</div>
-    <dl class="dl"><dt>رقم العقد/المحل</dt><dd>${t.no||''}${t.unit?' — '+esc(t.unit):''}</dd><dt>الإيجار السنوي شامل الضريبة</dt><dd class="num">${fmt(t.rent)}</dd>
-    <dt>قيمة الدفعة</dt><dd class="num">${fmt(t.installment)} — كل ${t.everyMonths||12} شهر</dd><dt>الدفعة القادمة</dt><dd>${fd(nextPay(t))}${issuedOpen(t).length&&nextPay(t)!==t.nextDue?' <small>(صدرت مطالبتها — الدفعة التي بعدها '+fd(t.nextDue)+')</small>':''}</dd>
+    <dl class="dl"><dt>رقم العقد/المحل</dt><dd>${t.no||''}${t.unit?' — '+esc(t.unit):''}</dd><dt>الإيجار السنوي شامل الضريبة</dt><dd class="num">${fmt(curRent(t))}${hasAm(t)&&curRent(t)!==(+t.rent||0)?' <small>(الأصلي في العقد '+fmt(t.rent)+')</small>':''}</dd>
+    <dt>قيمة الدفعة</dt><dd class="num">${fmt(instAt(t,TODAY))} — كل ${t.everyMonths||12} شهر${t.nextDue&&instAt(t,t.nextDue)!==instAt(t,TODAY)?' <small>(دفعة '+fd(t.nextDue)+': '+fmt(instAt(t,t.nextDue))+')</small>':''}</dd><dt>الدفعة القادمة</dt><dd>${fd(nextPay(t))}${issuedOpen(t).length&&nextPay(t)!==t.nextDue?' <small>(صدرت مطالبتها — الدفعة التي بعدها '+fd(t.nextDue)+')</small>':''}</dd>
     <dt>مدة العقد</dt><dd>${fd(t.start)} ← ${fd(t.end)}</dd><dt>رصيد مفتوح</dt><dd class="num"><b>${fmt(tenantOpen(id))}</b></dd>
     <dt>المسؤول</dt><dd>${esc(t.contact||'—')}</dd><dt>الجوال</dt><dd>${t.phone?'<span class="copy num" data-copy="'+esc(t.phone)+'">'+esc(t.phone)+'</span>':'—'}</dd>
     <dt>البريد</dt><dd>${esc(t.email||'—')}</dd><dt>مهمة ClickUp</dt><dd>${t.link?`<a href="${esc(t.link)}" target="_blank" rel="noopener">فتح المهمة</a>`:'—'}</dd>
     ${t.notes?`<dt>ملاحظات</dt><dd>${esc(t.notes)}</dd>`:''}</dl>
+    <div><h4 style="display:flex;align-items:center;gap:8px">تعديلات العقد (خصم / زيادة)<button class="btn sm" id="tAmend" style="margin-inline-start:auto">+ إضافة تعديل</button></h4>${amendList(t)}</div>
     <div><h4>المطالبات (${ds.length})</h4>${ds.length?`<div class="tbl"><table><thead><tr><th>الفترة</th><th>الاستحقاق</th><th>المتبقي</th><th>الحالة</th><th>الفوترة</th><th>المرحلة</th></tr></thead><tbody>${ds.map(d=>`<tr data-d="${d.id}"><td>${esc(d.period||'')}</td><td class="n">${fd(d.dueDate)}</td><td class="n">${fmt(remOf(d))}</td><td>${pill(dueStatus(d))}</td><td>${bPill(d)}</td><td>${dueStatus(d)==='paid'?'—':esc(d.stage||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">لا توجد مطالبات</div>'}</div>
     <div id="delBox"></div>`,
     `${t.nextDue&&+t.installment?'<button class="btn pri" id="tIssue">إصدار مطالبة الدفعة القادمة</button>':''}<button class="btn" id="tEdit">تعديل العقد</button><button class="btn" id="tDue">مطالبة يدوية</button><button class="btn ghost danger" id="tDel" style="margin-inline-start:auto">حذف</button>`);
@@ -864,7 +939,9 @@ function openTenant(id){
   bindCopy();
   if($('#tIssue'))$('#tIssue').onclick=async()=>{await issue(id,$('#tIssue'));openTenant(id)};
   $('#tEdit').onclick=()=>tenantForm(t);
-  $('#tDue').onclick=()=>{dueForm(null);$('#fTen').value=id;$('#fAmt').value=t.installment||''};
+  $('#tAmend').onclick=()=>amendForm(id);
+  document.querySelectorAll('[data-amdel]').forEach(b=>b.onclick=async()=>{const cur=tById(id);const nt={...cur,amendments:(cur.amendments||[]).filter(a=>a.id!==b.dataset.amdel)};if(await put('tenants',nt)){toast('تم حذف التعديل');openTenant(id)}});
+  $('#tDue').onclick=()=>{dueForm(null);$('#fTen').value=id;$('#fAmt').value=instAt(t,t.nextDue||TODAY)||''};
   $('#tDel').onclick=()=>{$('#delBox').innerHTML=`<div class="confirm">حذف ملف المستأجر؟ مطالباته تبقى في السجل. <button class="btn sm danger" id="tDelY">نعم، احذف</button><button class="btn sm" id="tDelN">إلغاء</button></div>`;$('#tDelN').onclick=()=>$('#delBox').innerHTML='';$('#tDelY').onclick=async()=>{await del('tenants',id);close();toast('تم حذف الملف')}};
 }
 function tenantForm(t){
@@ -874,9 +951,9 @@ function tenantForm(t){
     <label class="full">اسم المستأجر / المنشأة<input id="eName" value="${esc(t.name)}"></label>
     <label>رقم المستأجر<input id="eNo" type="number" value="${t.no||''}"></label>
     <label>رقم المحل / الموقع<input id="eUnit" value="${esc(t.unit||'')}"></label>
-    <label>الإيجار السنوي شامل الضريبة<input id="eRent" type="number" step="0.01" value="${t.rent}"></label>
+    <label>${hasAm(t)?'الإيجار السنوي الأصلي (قبل التعديلات)':'الإيجار السنوي شامل الضريبة'}<input id="eRent" type="number" step="0.01" value="${t.rent}"></label>
     <label>دورية الدفع<select id="eEvery">${[[1,'شهري'],[2,'كل شهرين'],[3,'ربع سنوي'],[4,'كل 4 أشهر'],[6,'نصف سنوي'],[12,'سنوي']].map(o=>`<option value="${o[0]}" ${+t.everyMonths===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></label>
-    <label>قيمة الدفعة<input id="eInst" type="number" step="0.01" value="${t.installment}"></label>
+    <label>${hasAm(t)?'قيمة الدفعة الأصلية':'قيمة الدفعة'}<input id="eInst" type="number" step="0.01" value="${t.installment}"></label>
     <label>الاستحقاق القادم<input id="eNext" type="date" value="${t.nextDue||''}"></label>
     <label>بداية العقد<input id="eStart" type="date" value="${t.start||''}"></label>
     <label>نهاية العقد<input id="eEnd" type="date" value="${t.end||''}"></label>
@@ -901,8 +978,8 @@ function tenantForm(t){
 /* ---------- export ---------- */
 async function exportXlsx(dl){
   const wb=XLSX.utils.book_new();
-  const T=tenants.slice().sort((a,b)=>(a.no||0)-(b.no||0)).map(t=>({'م':t.no,'المستأجر':t.name,'المحل':t.unit,'الإيجار السنوي':+t.rent||0,'قيمة الدفعة':+t.installment||0,'الدورية (أشهر)':t.everyMonths,'الاستحقاق القادم':t.nextDue,'بداية العقد':t.start,'نهاية العقد':t.end,'حالة العقد':STATE[contractState(t)],'رصيد مفتوح':tenantOpen(t.id),'المسؤول':t.contact,'الجوال':t.phone,'البريد':t.email,'ClickUp':t.link,'ملاحظات':t.notes}));
-  const D=dues.slice().sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).map(d=>({'المستأجر':d.tenantName,'الفترة':d.period,'الاستحقاق':d.dueDate,'المبلغ':+d.amount||0,'المدفوع':paidOf(d),'المتبقي':remOf(d),'الحالة':ST[dueStatus(d)][0],'الفوترة':BILL[billOf(d)][0],'رقم الفاتورة':d.invNo||'','تاريخ الفاتورة':d.invDate||'','المرحلة':d.stage,'تاريخ المرحلة':d.stageDate,'أيام في المرحلة':stageAge(d),'آخر ملاحظة':lastNote(d)}));
+  const T=tenants.slice().sort((a,b)=>(a.no||0)-(b.no||0)).map(t=>({'م':t.no,'المستأجر':t.name,'المحل':t.unit,'الإيجار السنوي الأصلي':+t.rent||0,'الإيجار السنوي الحالي':curRent(t),'قيمة الدفعة الحالية':instAt(t,TODAY),'عدد تعديلات العقد':(t.amendments||[]).length,'الدورية (أشهر)':t.everyMonths,'الاستحقاق القادم':t.nextDue,'بداية العقد':t.start,'نهاية العقد':t.end,'حالة العقد':STATE[contractState(t)],'رصيد مفتوح':tenantOpen(t.id),'المسؤول':t.contact,'الجوال':t.phone,'البريد':t.email,'ClickUp':t.link,'ملاحظات':t.notes}));
+  const D=dues.slice().sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).map(d=>({'المستأجر':d.tenantName,'الفترة':d.period,'الاستحقاق':d.dueDate,'المبلغ':+d.amount||0,'الخصم':discOf(d),'الصافي':netOf(d),'سبب الخصم':d.discount?d.discount.reason||'':'','المدفوع':paidOf(d),'المتبقي':remOf(d),'الحالة':ST[dueStatus(d)][0],'الفوترة':BILL[billOf(d)][0],'رقم الفاتورة':d.invNo||'','تاريخ الفاتورة':d.invDate||'','المرحلة':d.stage,'تاريخ المرحلة':d.stageDate,'أيام في المرحلة':stageAge(d),'آخر ملاحظة':lastNote(d)}));
   const P=[];dues.forEach(d=>(d.payments||[]).forEach(p=>P.push({'المستأجر':d.tenantName,'الفترة':d.period,'التاريخ':p.date,'المبلغ':+p.amount,'الطريقة':p.method,'ملاحظة':p.note})));
   [[D,'المطالبات'],[T,'العقود'],[P,'الدفعات المستلمة']].forEach(([rows,n])=>{const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{'':''}]);ws['!views']=[{RTL:true}];XLSX.utils.book_append_sheet(wb,ws,n)});
   wb.Workbook={Views:[{RTL:true}]};
