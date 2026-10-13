@@ -178,7 +178,20 @@ h4{margin:0 0 8px;font-size:13px;font-family:var(--f-display);font-weight:600}
 .auth .msg{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
 .auth .msg.err{background:var(--bad-soft);color:var(--bad)} .auth .msg.ok{background:var(--ok-soft);color:var(--ok)}
 .who{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
-.ro #btnNewDue,.ro #btnNewTenant,.ro [data-pay],.ro [data-stg],.ro [data-issue],.ro #dPay,.ro #dStg,.ro #dEdit,.ro #dDel,.ro #dBill,.ro #tIssue,.ro #tEdit,.ro #tDue,.ro #tDel,.ro #dDisc,.ro #tAmend,.ro [data-amdel]{display:none!important}
+.np-dues #btnNewDue,.np-dues [data-pay],.np-dues [data-stg],.np-dues [data-issue],.np-dues #dPay,.np-dues #dStg,.np-dues #dEdit,.np-dues #dBill,.np-dues #tIssue,.np-dues #tDue,.np-dues #docSent,.np-dues #dDisc,
+.np-contracts #btnNewTenant,.np-contracts #tEdit,.np-contracts #tAmend,.np-contracts [data-amdel],
+.np-discount #dDisc,.np-discount #tAmend,.np-discount [data-amdel],
+.np-delete #dDel,.np-delete #tDel{display:none!important}
+.permgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 12px;padding:8px 2px 2px}
+.permgrid label{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--fg);cursor:pointer}
+.permgrid input{width:auto}
+.ucard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.ucard .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ucard .top b{font-weight:500;direction:ltr;margin-inline-end:auto;overflow-wrap:anywhere}
+.aud{display:flex;flex-direction:column;gap:0}
+.aud .r{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;padding:9px 0;border-top:1px solid var(--line);align-items:start}
+.aud .r:first-child{border-top:0}
+.aud .r small{color:var(--muted);display:block;font-size:11.5px}
 @media (prefers-reduced-motion:no-preference){.drawer{animation:sl .18s ease-out}@keyframes sl{from{transform:translateX(-30px);opacity:.6}}}
 </style>
 
@@ -379,9 +392,9 @@ async function put(col,obj){
     if(e&&e.code==='unavailable'){try{await new Promise(r=>setTimeout(r,600+Math.random()*600));await db.collection(col).doc(id).set(rest);const arr=col==='dues'?dues:tenants;const i=arr.findIndex(x=>x.id===id);if(i>=0)arr[i]=obj;else arr.push(obj);render();return true}catch(e2){e=e2}}
     console.error('db write failed',col,id,e);
     if(e&&e.code==='invalid_argument'){showRO();return false}
-    toast('تعذّر الحفظ ('+((e&&e.code)||'خطأ')+(e&&e.message?' — '+e.message:'')+')');return false}
+    const m=(e&&e.message)||'';toast(/لا تملك/.test(m)?m.replace(/^.*?(لا تملك[^"]*).*$/,'$1'):'تعذّر الحفظ ('+((e&&e.code)||'خطأ')+(m?' — '+m:'')+')');return false}
 }
-async function del(col,id){if(!db)return;try{await db.collection(col).doc(id).delete();if(col==='dues')dues=dues.filter(x=>x.id!==id);else tenants=tenants.filter(x=>x.id!==id);render()}catch(e){toast('تعذّر الحذف')}}
+async function del(col,id){if(!db)return;if(!PERMS.delete&&sb){toast('لا تملك صلاحية الحذف');return}try{await db.collection(col).doc(id).delete();if(col==='dues')dues=dues.filter(x=>x.id!==id);else tenants=tenants.filter(x=>x.id!==id);render()}catch(e){toast('تعذّر الحذف')}}
 
 async function boot(){
   render();
@@ -398,6 +411,10 @@ async function boot(){
 }
 
 /* ---------- Supabase backend ---------- */
+const PERM_LIST=[['edit_dues','المطالبات والدفعات','إضافة المطالبات وتسجيل الدفعات ونقل المراحل والفوترة'],['edit_contracts','العقود','إضافة العقود وتعديل بياناتها'],['discount','الخصومات','الخصم على المطالبات وتعديلات العقد (خصم/زيادة)'],['delete','الحذف','حذف المطالبات والعقود'],['users','إدارة المستخدمين','إضافة المستخدمين وصلاحياتهم وسجل التعديلات']];
+const ROLE_DEF={admin:{edit_dues:1,edit_contracts:1,discount:1,delete:1,users:1},editor:{edit_dues:1,edit_contracts:1},viewer:{}};
+function permsOf(u){if(!u)return {};if(u.role==='admin')return {...ROLE_DEF.admin};const src=u.perms||ROLE_DEF[u.role]||{};const o={};PERM_LIST.forEach(([k])=>o[k]=!!src[k]);return o}
+let PERMS={};
 let sb=null, MY_ROLE=null, MY_EMAIL='', started=false;
 const ROLES={admin:['مدير','p-acc'],editor:['محرر','p-paid'],viewer:['مشاهد','p-up']};
 let authMode='login';
@@ -443,14 +460,16 @@ async function bootSupabase(){
 async function startSession(session){
   if(started)return;started=true;hideAuth();
   MY_EMAIL=(session.user.email||'').toLowerCase();
-  const {data:u,error:ue}=await sb.from('app_users').select('role').eq('email',MY_EMAIL).maybeSingle();
+  let {data:u,error:ue}=await sb.from('app_users').select('role,perms').eq('email',MY_EMAIL).maybeSingle();
+  if(ue&&/perms/.test(ue.message||'')){({data:u,error:ue}=await sb.from('app_users').select('role').eq('email',MY_EMAIL).maybeSingle())}
   if(ue){$('#whoBox').hidden=false;$('#whoTxt').textContent=MY_EMAIL;const n=$('#noDb');n.hidden=false;n.textContent='قاعدة البيانات غير مجهزة بعد: شغّل ملف 1_schema.sql ثم 2_seed.sql في Supabase ← SQL Editor، ثم أعد تحميل الصفحة. ('+ue.message+')';$('#syncTxt').textContent='غير مجهزة';$('#btnNewDue').hidden=true;$('#btnNewTenant').hidden=true;return}
   MY_ROLE=u?u.role:null;
   $('#whoBox').hidden=false;$('#whoTxt').textContent=MY_EMAIL+(MY_ROLE?' · '+ROLES[MY_ROLE][0]:'');
   if(!MY_ROLE){const n=$('#noDb');n.hidden=false;n.textContent='حسابك ('+MY_EMAIL+') غير مضاف للنظام. اطلب من مدير النظام إضافة بريدك من شاشة «المستخدمون» ثم أعد تحميل الصفحة.';$('#syncTxt').textContent='بدون صلاحية';$('#btnNewDue').hidden=true;$('#btnNewTenant').hidden=true;return}
-  canWrite=MY_ROLE!=='viewer';who={owner:MY_ROLE==='admin',edit:canWrite,write:canWrite};
-  document.documentElement.classList.toggle('ro',!canWrite);
-  if(MY_ROLE==='admin'){const b=$('#btnShare');b.hidden=false;b.onclick=openUsers}
+  PERMS=permsOf(u);canWrite=PERMS.edit_dues||PERMS.edit_contracts;who={owner:PERMS.users,edit:canWrite,write:canWrite};
+  const rc=document.documentElement.classList;rc.toggle('np-dues',!PERMS.edit_dues);rc.toggle('np-contracts',!PERMS.edit_contracts);rc.toggle('np-discount',!PERMS.discount);rc.toggle('np-delete',!PERMS.delete);
+  if(!canWrite){const n=$('#noDb');n.hidden=false;n.textContent='صلاحيتك عرض فقط. لطلب صلاحيات إضافية تواصل مع مدير النظام.'}
+  if(PERMS.users){const b=$('#btnShare');b.hidden=false;b.onclick=openUsers}
   db={collection:col=>({onSnapshot:()=>()=>{},doc:id=>({
     set:async d=>{const {error}=await sb.from(col).upsert({id,data:d});if(error)throw{code:error.code==='42501'||/row-level security/i.test(error.message)?'invalid_argument':'server',message:error.message}},
     delete:async()=>{const {error}=await sb.from(col).delete().eq('id',id);if(error)throw{code:'server',message:error.message}}})})};
@@ -467,22 +486,60 @@ async function loadAll(first){
   catch(e){$('#dot').classList.remove('on');$('#syncTxt').textContent='تعذّر الاتصال';if(first)toast('تعذّر تحميل البيانات: '+(e.message||e))}
 }
 function openUsers(){
-  drawer('المستخدمون والصلاحيات',`<div class="legend" style="display:block;line-height:1.8"><b>مدير</b>: يعدّل ويدير المستخدمين · <b>محرر</b>: يضيف ويعدّل المطالبات والعقود · <b>مشاهد</b>: عرض فقط.</div>
+  drawer('المستخدمون والصلاحيات',`<div class="legend" style="display:block;line-height:1.8"><b>مدير</b>: كل الصلاحيات. <b>محرر</b>: المطالبات والعقود بدون خصم أو حذف. <b>مشاهد</b>: عرض فقط. واختر «مخصص» لتحدد صلاحيات بعينها لأي مستخدم.</div>
     <div class="form"><label class="full">البريد الإلكتروني<input id="uMail" type="email" inputmode="email" placeholder="name@company.com" dir="ltr"></label>
     <label>الصلاحية<select id="uRole"><option value="editor">محرر</option><option value="viewer">مشاهد</option><option value="admin">مدير</option></select></label>
     <label style="justify-content:flex-end"><button class="btn pri" id="uAdd" type="button">إضافة مستخدم</button></label></div>
-    <div><h4>المستخدمون</h4><div id="uList"><div class="empty">جارٍ التحميل…</div></div></div>
-    <div class="legend" style="display:block;line-height:1.8">بعد الإضافة أرسل للمستخدم رابط النظام. أول مرة يضغط «أول مرة؟ أنشئ كلمة مرور» ويستخدم نفس البريد.</div>`,
-    `<button class="btn" id="uCopy">نسخ رابط النظام</button>`);
-  const paint=async()=>{const {data,error}=await sb.from('app_users').select('email,role').order('created_at');
+    <div><h4>المستخدمون</h4><div id="uList" style="display:flex;flex-direction:column;gap:8px"><div class="empty">جارٍ التحميل…</div></div></div>
+    <div class="legend" style="display:block;line-height:1.8">بعد الإضافة أرسل للمستخدم رابط النظام. أول مرة يضغط «أول مرة؟ أنشئ كلمة مرور» ويستخدم نفس البريد. أي تغيير في الصلاحيات يسري عند دخوله القادم أو تحديث الصفحة.</div>`,
+    `<button class="btn" id="uAudit">سجل التعديلات</button><button class="btn" id="uBackup">نسخة احتياطية</button><button class="btn" id="uCopy">نسخ رابط النظام</button>`);
+  const paint=async()=>{let {data,error}=await sb.from('app_users').select('email,role,perms').order('created_at');
+    if(error&&/perms/.test(error.message||'')){({data,error}=await sb.from('app_users').select('email,role').order('created_at'));if(!error)toast('لتفعيل الصلاحيات المخصصة شغّل ملف 3_permissions.sql في Supabase')}
     if(error){$('#uList').innerHTML='<div class="empty">'+esc(error.message)+'</div>';return}
-    $('#uList').innerHTML=`<div class="tbl"><table><tbody>${data.map(u=>`<tr style="cursor:default"><td dir="ltr" style="text-align:start">${esc(u.email)}</td><td>${u.email===MY_EMAIL?`<span class="pill ${ROLES[u.role][1]}">${ROLES[u.role][0]} (أنت)</span>`:`<select data-role="${esc(u.email)}">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${k===u.role?'selected':''}>${v[0]}</option>`).join('')}</select>`}</td><td class="n">${u.email===MY_EMAIL?'':`<button class="btn sm danger" data-rm="${esc(u.email)}">إزالة</button>`}</td></tr>`).join('')}</tbody></table></div>`;
-    document.querySelectorAll('[data-role]').forEach(s=>s.onchange=async()=>{const {error}=await sb.from('app_users').update({role:s.value}).eq('email',s.dataset.role);toast(error?error.message:'تم تحديث الصلاحية')});
-    document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{b.disabled=true;const {error}=await sb.from('app_users').delete().eq('email',b.dataset.rm);toast(error?error.message:'تمت الإزالة');paint()})};
+    $('#uList').innerHTML=data.map(u=>{const me=u.email===MY_EMAIL;const pr=permsOf(u);const mode=u.role==='admin'?'admin':u.perms?'custom':u.role;
+      return `<div class="ucard" data-u="${esc(u.email)}"><div class="top"><b>${esc(u.email)}</b>${me?`<span class="pill ${ROLES[u.role][1]}">${ROLES[u.role][0]} (أنت)</span>`:`<select data-mode>${[['admin','مدير'],['editor','محرر'],['viewer','مشاهد'],['custom','مخصص']].map(([k,v])=>`<option value="${k}" ${k===mode?'selected':''}>${v}</option>`).join('')}</select><button class="btn sm danger" data-rm>إزالة</button>`}</div>
+        <div class="permgrid">${PERM_LIST.map(([k,l,h])=>`<label title="${esc(h)}"><input type="checkbox" data-p="${k}" ${pr[k]?'checked':''} ${me||mode!=='custom'?'disabled':''}> ${l}</label>`).join('')}</div></div>`}).join('');
+    document.querySelectorAll('.ucard').forEach(c=>{const em=c.dataset.u;const sel=c.querySelector('[data-mode]');if(!sel)return;
+      const save=async(patch,msg)=>{const {error}=await sb.from('app_users').update(patch).eq('email',em);toast(error?error.message:msg);paint()};
+      sel.onchange=()=>{const m=sel.value;if(m==='custom'){const cur=permsOf({role:'editor'});save({role:'editor',perms:cur},'اختر الصلاحيات المطلوبة بالعلامات')}else save({role:m,perms:null},'تم تحديث الصلاحية')};
+      c.querySelectorAll('[data-p]').forEach(cb=>cb.onchange=()=>{const o={};c.querySelectorAll('[data-p]').forEach(x=>o[x.dataset.p]=x.checked);save({role:o.users?'admin':'editor',perms:o.users?null:o},'تم حفظ الصلاحيات')});
+      c.querySelector('[data-rm]').onclick=async e=>{e.target.disabled=true;const {error}=await sb.from('app_users').delete().eq('email',em);toast(error?error.message:'تمت الإزالة');paint()};
+    })};
   paint();
   $('#uAdd').onclick=async()=>{const m=val('uMail').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m)){toast('أدخل بريداً صحيحاً');return}
-    const {error}=await sb.from('app_users').upsert({email:m,role:val('uRole')});if(error){toast(error.message);return}$('#uMail').value='';toast('تمت إضافة '+m);paint()};
+    const {error}=await sb.from('app_users').upsert({email:m,role:val('uRole'),perms:null});if(error){toast(error.message);return}$('#uMail').value='';toast('تمت إضافة '+m);paint()};
   $('#uCopy').onclick=()=>{const u=location.origin+location.pathname;Promise.resolve().then(()=>navigator.clipboard.writeText(u)).then(()=>toast('تم نسخ الرابط'),()=>toast(u))};
+  $('#uAudit').onclick=()=>openAudit();
+  $('#uBackup').onclick=()=>downloadBackup();
+}
+function downloadFile(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
+async function downloadBackup(){
+  try{const [t,d,u]=await Promise.all([fetchAll('tenants'),fetchAll('dues'),sb.from('app_users').select('email,role,perms').then(r=>r.data||[])]);
+    downloadFile('نسخة احتياطية إيجارات كرم مول '+TODAY+'.json',JSON.stringify({system:'karam-rent',exported_at:new Date().toISOString(),by:MY_EMAIL,tenants:t,dues:d,users:u},null,1),'application/json');
+    if(window.XLSX)exportXlsx(null);toast('تم تنزيل النسخة الاحتياطية (JSON + Excel)')}catch(e){toast('تعذّر إنشاء النسخة: '+(e.message||e))}
+}
+const KEYL={amount:'المبلغ',stage:'المرحلة',stageDate:'تاريخ المرحلة',payments:'الدفعات',discount:'الخصم',nextDue:'الاستحقاق القادم',amendments:'تعديلات العقد',rent:'الإيجار',installment:'قيمة الدفعة',billing:'الفوترة',invNo:'رقم الفاتورة',closed:'الإغلاق',history:'السجل',notes:'الملاحظات',name:'الاسم',end:'نهاية العقد',start:'بداية العقد',dueDate:'تاريخ الاستحقاق',state:'حالة العقد',claimNo:'رقم المطالبة',phone:'الجوال',contact:'المسؤول',everyMonths:'الدورية',period:'الفترة'};
+async function openAudit(filter){
+  filter=filter||'all';
+  drawer('سجل التعديلات',`<div class="chips" id="audChips">${[['all','الكل'],['delete','المحذوفات'],['update','التعديلات'],['insert','الإضافات']].map(([k,l])=>`<button class="chip" aria-pressed="${k===filter}" data-f="${k}">${l}</button>`).join('')}</div>
+    <div class="legend" style="display:block">كل إضافة أو تعديل أو حذف يُحفظ هنا مع نسخة من البيانات قبله. «استرجاع» يعيد السجل كما كان قبل هذا التغيير.</div>
+    <div class="aud" id="audList"><div class="empty">جارٍ التحميل…</div></div>`,`<button class="btn" id="audBack">رجوع للمستخدمين</button>`);
+  $('#audBack').onclick=openUsers;
+  document.querySelectorAll('#audChips .chip').forEach(c=>c.onclick=()=>openAudit(c.dataset.f));
+  let q=sb.from('audit_log').select('id,at,email,tbl,row_id,action,before,after').order('at',{ascending:false}).limit(300);
+  if(filter!=='all')q=q.eq('action',filter);
+  const {data,error}=await q;
+  if(error){$('#audList').innerHTML='<div class="empty">'+(/audit_log/.test(error.message)?'سجل التعديلات غير مفعّل بعد — شغّل ملف 3_permissions.sql في Supabase.':esc(error.message))+'</div>';return}
+  if(!data.length){$('#audList').innerHTML='<div class="empty">لا توجد سجلات بعد.</div>';return}
+  const AL={insert:['إضافة','p-paid'],update:['تعديل','p-up'],delete:['حذف','p-late']};
+  $('#audList').innerHTML=data.map(r=>{const o=r.after||r.before||{};const nm=o.name||o.tenantName||r.row_id;
+    const keys=r.action==='update'?Object.keys({...(r.before||{}),...(r.after||{})}).filter(k=>k!=='history'&&JSON.stringify((r.before||{})[k])!==JSON.stringify((r.after||{})[k])).map(k=>KEYL[k]||k):[];
+    const dt=new Date(r.at);
+    return `<div class="r"><span class="pill ${AL[r.action][1]}">${AL[r.action][0]}</span><div><b style="font-weight:500">${esc(nm)}</b>${r.tbl==='dues'&&o.period?' <small style="display:inline">'+esc(o.period)+'</small>':''}<small>${r.tbl==='tenants'?'عقد':'مطالبة'} · ${esc(r.email||'')} · ${fd(iso(dt))} ${pad(dt.getHours())}:${pad(dt.getMinutes())}${keys.length?' · '+esc(keys.join('، ')):''}</small></div>
+      <div>${r.before&&PERMS.users?`<button class="btn sm" data-rest="${r.id}">استرجاع</button>`:''}</div></div>`}).join('');
+  document.querySelectorAll('[data-rest]').forEach(btn=>btn.onclick=async()=>{const r=data.find(x=>String(x.id)===btn.dataset.rest);if(!r)return;btn.disabled=true;
+    const {error}=await sb.from(r.tbl).upsert({id:r.row_id,data:r.before});
+    if(error){toast(error.message);btn.disabled=false;return}toast('تم الاسترجاع');await loadAll(false);openAudit(filter)});
 }
 
 /* ---------- render ---------- */
