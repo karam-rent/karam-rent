@@ -167,6 +167,7 @@ tfoot td{font-weight:600;background:var(--surface-2)}
 .form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
 .form input,.form select,.form textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;font-size:14px;width:100%}
 .form textarea{min-height:70px;resize:vertical}
+.form .permgrid label{flex-direction:row;align-items:center;gap:6px;color:var(--ink);font-size:13px}.form .permgrid input{width:auto}
 @media (max-width:520px){.form{grid-template-columns:1fr}}
 .dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
 .dl dt{color:var(--muted)} .dl dd{margin:0;min-width:0;overflow-wrap:anywhere}
@@ -656,7 +657,7 @@ function openAlerts(tab){
   drawer('التنبيهات',`<div class="chips">${[['all','الكل ('+all.filter(a=>!alertHidden(a)).length+')'],['bad','عاجل ('+all.filter(a=>a.sev==='bad'&&!alertHidden(a)).length+')'],['rem','التذكيرات']].map(([k,l])=>`<button class="chip" aria-pressed="${k===tab}" data-at="${k}">${l}</button>`).join('')}</div>
     <div class="al">${vis.length?vis.map((a,i)=>`<div class="it ${alertSeen(a)?'':'new'}" data-i="${i}"><span class="pill ${a.sev==='bad'?'p-late':a.sev==='warn'?'p-due':'p-up'}">${esc(a.tag)}</span><div><b>${esc(a.title)}</b><small>${esc(a.sub)}</small></div><div>${a.rem&&(PERMS.edit_dues||PERMS.edit_contracts)?`<button class="x" data-rdone="${a.rem}" title="تم">✓ تم</button>`:''}<button class="x" data-hide="${i}" title="إخفاء">إخفاء</button></div></div>`).join(''):'<div class="empty">لا توجد تنبيهات — كل شيء تحت السيطرة.</div>'}</div>
     ${hiddenN?`<div class="legend" style="display:block">${hiddenN} تنبيه مخفي · <a href="#" id="alUnhide">إظهارها</a></div>`:''}`,
-    `${REM_OK&&(PERMS.edit_dues||PERMS.edit_contracts)?'<button class="btn pri" id="alNew">+ تذكير جديد</button>':''}<button class="btn" id="alCfg">إعدادات التنبيهات</button>`);
+    `${REM_OK&&(PERMS.edit_dues||PERMS.edit_contracts)?'<button class="btn pri" id="alNew">+ تذكير جديد</button>':''}<button class="btn" id="alCfg">إعدادات التنبيهات</button>${PERMS.users?'<button class="btn" id="alMail">✉ تنبيهات الإيميل</button>':''}`);
   // mark as seen
   const seen=st.seen||{};all.forEach(a=>seen[a.key]=1);st.seen=seen;alSave(st);updateBell();
   document.querySelectorAll('[data-at]').forEach(c=>c.onclick=()=>openAlerts(c.dataset.at));
@@ -666,6 +667,81 @@ function openAlerts(tab){
   if($('#alUnhide'))$('#alUnhide').onclick=e=>{e.preventDefault();const s2=alStore();s2.hidden={};alSave(s2);openAlerts(tab)};
   if($('#alNew'))$('#alNew').onclick=()=>remForm(null,null,'',()=>openAlerts('rem'));
   $('#alCfg').onclick=()=>alertCfgForm();
+  if($('#alMail'))$('#alMail').onclick=()=>emailForm();
+}
+const DOWS=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const MAIL_TYPES=[['stage','تجاوز مراحل التحصيل'],['ended','عقود انتهت ولم تُجدد'],['exp','عقود قربت تنتهي'],['pay','دفعات لم تُصدر مطالبتها'],['due','مطالبات تستحق قريباً'],['bill','مطالبات غير مفوترة'],['amd','نهاية خصم/تعديل مؤقت'],['rem','التذكيرات اليدوية']];
+async function emailForm(){
+  if(!PERMS.users)return;
+  drawer('تنبيهات الإيميل','<div class="empty">جارٍ التحميل…</div>','');
+  let row=null,keyOk=false;
+  try{const r=await sb.from('email_settings').select('data,last_sent').eq('project',CUR).maybeSingle();if(r.error)throw r.error;row=r.data;
+      const k=await sb.rpc('email_key_status');if(k.error)throw k.error;keyOk=!!k.data}
+  catch(e){drawer('تنبيهات الإيميل',`<div class="legend" style="display:block;line-height:1.9">ميزة الإيميل غير مفعّلة بعد في قاعدة البيانات.<br>شغّل ملف <b>7_email_alerts.sql</b> في Supabase ← SQL Editor ثم افتح هذه الشاشة مرة أخرى.</div>`,`<button class="btn" id="mBack">رجوع</button>`);$('#mBack').onclick=()=>openAlerts();return}
+  const c=Object.assign({enabled:false,time:'08:00',days:[0,1,2,3,4],to:[MY_EMAIL],types:{},exp:90,due:7,disc:30,skipEmpty:true,onlyUrgent:false,from:'',until:'',sender:''},row&&row.data||{});
+  const times=[];for(let h=5;h<=23;h++)for(const m of ['00','30'])times.push(pad(h)+':'+m);
+  const cb=(id,on,label,extra)=>`<label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="${id}" style="width:auto" ${on?'checked':''} ${extra||''}> ${label}</label>`;
+  drawer('تنبيهات الإيميل — '+esc(PROJ_NAME),`
+    <div class="form">
+      <div class="full" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)">
+        ${cb('mOn',c.enabled,'<b>الإرسال اليومي شغّال</b>')}
+        <span class="pill ${c.enabled?'p-paid':'p-mute'}" style="margin-inline-start:auto">${c.enabled?'يعمل':'متوقف'}</span></div>
+      <label>وقت الإرسال (بتوقيت السعودية)<select id="mTime">${times.map(t=>`<option ${t===c.time?'selected':''}>${t}</option>`).join('')}</select></label>
+      <label>يبدأ من تاريخ (اختياري)<input type="date" id="mFrom" value="${esc(c.from||'')}"></label>
+      <label class="full">أيام الإرسال<div class="chips" id="mDays">${DOWS.map((d,i)=>`<button type="button" class="chip" data-dow="${i}" aria-pressed="${(c.days||[]).includes(i)}">${d}</button>`).join('')}</div></label>
+      <label>يتوقف تلقائياً بعد تاريخ (اختياري)<input type="date" id="mUntil" value="${esc(c.until||'')}"></label>
+      <label>&nbsp;${cb('mSkip',c.skipEmpty,'لا ترسل إذا ما فيه تنبيهات')}</label>
+      <label class="full">المستلمون — إيميل في كل سطر<textarea id="mTo" dir="ltr" style="text-align:left">${esc((c.to||[]).join('\n'))}</textarea></label>
+      <div class="full"><h4 style="margin:4px 0 6px">محتوى الرسالة</h4>
+        <div class="permgrid">${MAIL_TYPES.map(([k,l])=>`<label><input type="checkbox" data-mt="${k}" ${(c.types||{})[k]!==false?'checked':''}> ${l}</label>`).join('')}</div>
+        ${cb('mUrg',c.onlyUrgent,'العاجل فقط')}</div>
+      <label>تنبيه انتهاء العقود قبل<select id="mExp">${[30,60,90,120,180].map(n=>`<option ${n===+c.exp?'selected':''} value="${n}">${n} يوم</option>`).join('')}</select></label>
+      <label>تنبيه الدفعات والمطالبات قبل<select id="mDue">${[3,7,14,30].map(n=>`<option ${n===+c.due?'selected':''} value="${n}">${n} يوم</option>`).join('')}</select></label>
+      <label>نهاية الخصم المؤقت قبل<select id="mDisc">${[7,14,30,60].map(n=>`<option ${n===+c.disc?'selected':''} value="${n}">${n} يوم</option>`).join('')}</select></label>
+      <label>عنوان المرسل (اختياري)<input id="mSender" dir="ltr" placeholder="Karam Alerts <onboarding@resend.dev>" value="${esc(c.sender||'')}"></label>
+      <label class="full">مفتاح Resend ${keyOk?'<span class="pill p-paid">محفوظ ✓</span>':'<span class="pill p-late">غير محفوظ</span>'}<input id="mKey" type="password" dir="ltr" autocomplete="off" placeholder="${keyOk?'اتركه فارغاً للإبقاء على المفتاح الحالي':'re_...'}"></label>
+    </div>
+    <div class="legend" style="display:block;line-height:1.8">${row&&row.last_sent?'آخر إرسال تلقائي: '+fd(row.last_sent)+' · ':''}الرسالة تُرسل مرة واحدة في اليوم في الوقت المحدد. للإيقاف: أزل علامة «الإرسال اليومي شغّال» واحفظ.</div>
+    <div id="mLog"></div>`,
+    `<button class="btn pri" id="mSave">حفظ</button><button class="btn" id="mTest">إرسال تجربة الآن</button><button class="btn" id="mLogB">سجل الإرسال</button><button class="btn ghost" id="mBack">رجوع</button>`);
+  document.querySelectorAll('[data-dow]').forEach(b=>b.onclick=()=>b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')==='true'?'false':'true'));
+  $('#mBack').onclick=()=>openAlerts();
+  const collect=()=>{
+    const to=val('mTo').split(/[\s,;،]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+    const bad=to.filter(x=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+    const types={};document.querySelectorAll('[data-mt]').forEach(i=>types[i.dataset.mt]=i.checked);
+    const days=[...document.querySelectorAll('[data-dow]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>+b.dataset.dow);
+    return {bad,data:{enabled:$('#mOn').checked,time:val('mTime'),days,from:val('mFrom'),until:val('mUntil'),to,types,onlyUrgent:$('#mUrg').checked,skipEmpty:$('#mSkip').checked,exp:+val('mExp'),due:+val('mDue'),disc:+val('mDisc'),sender:val('mSender')}};
+  };
+  const save=async()=>{
+    const {bad,data}=collect();
+    if(bad.length){toast('إيميل غير صحيح: '+bad[0]);return false}
+    if(data.enabled&&!data.to.length){toast('أضف إيميل مستلم واحد على الأقل');return false}
+    if(data.enabled&&!data.days.length){toast('اختر يوماً واحداً على الأقل');return false}
+    if(data.from&&data.until&&data.until<data.from){toast('تاريخ التوقف قبل تاريخ البداية');return false}
+    const k=val('mKey');
+    if(k){const r=await sb.rpc('set_email_key',{newkey:k});if(r.error){toast(r.error.message);return false}keyOk=true}
+    if(data.enabled&&!keyOk){toast('أدخل مفتاح Resend أولاً');return false}
+    const {error}=await sb.from('email_settings').upsert({project:CUR,data,updated_at:new Date().toISOString()});
+    if(error){toast(error.message);return false}
+    return true;
+  };
+  $('#mSave').onclick=async()=>{if(await save()){toast('تم حفظ إعدادات الإيميل');emailForm()}};
+  $('#mTest').onclick=async()=>{const b=$('#mTest');b.disabled=true;
+    try{if(!await save())return;const r=await sb.rpc('send_alert_email_test',{p:CUR});
+      if(r.error){toast(r.error.message);return}
+      const d=r.data||{};if(!d.ok){toast(d.reason||'تعذّر الإرسال');return}
+      toast('أُرسلت رسالة تجربة فيها '+d.n+' تنبيه — تأكد من البريد خلال دقيقة');setTimeout(showLog,2500)}
+    finally{b.disabled=false}};
+  const showLog=async()=>{const r=await sb.rpc('email_log_list',{p:CUR});const el=$('#mLog');if(!el)return;
+    if(r.error){el.innerHTML='<div class="empty">'+esc(r.error.message)+'</div>';return}
+    const L=r.data||[];
+    el.innerHTML=`<h4 style="margin:14px 0 6px">سجل الإرسال</h4>`+(L.length?`<div class="al">${L.map(l=>{
+      const ok=l.status>=200&&l.status<300,fail=l.kind==='error'||(l.status!=null&&!ok);
+      let msg=l.note||'';if(!msg&&fail){try{msg=JSON.parse(l.resp).message||l.resp}catch(e){msg=l.resp||'فشل الاتصال'}}
+      return `<div class="it"><span class="pill ${fail?'p-late':ok?'p-paid':'p-up'}">${fail?'فشل':ok?'وصل للخادم':l.note?'لم تُرسل':'قيد الإرسال'}</span><div><b>${l.kind==='test'?'تجربة':l.kind==='error'?'خطأ':'تلقائي'} — ${esc(new Date(l.at).toLocaleString('en-GB',{timeZone:'Asia/Riyadh',dateStyle:'short',timeStyle:'short'}))}</b><small dir="auto">${l.n!=null?l.n+' تنبيه · ':''}${esc((l.recipients||[]).join('، '))}${msg?' · '+esc(msg):''}</small></div><div></div></div>`}).join('')}</div>`:'<div class="empty">لا يوجد إرسال بعد.</div>');
+    el.scrollIntoView({behavior:'smooth',block:'start'})};
+  $('#mLogB').onclick=showLog;
 }
 function alertCfgForm(){const c=alCfg();
   drawer('إعدادات التنبيهات',`<div class="form">
