@@ -14,8 +14,8 @@ create table if not exists public.projects (
 
 insert into public.projects (id, sort, data) values
  ('mall', 1, '{"name":"إيجارات كرم مول","company":"شركة مجمع كرم مول التجاري","cr":"1122005677","vat":"310154341300003","addr":"المجمعة - حي المستقبل - طريق الملك خالد","prefix":"KM"}'),
- ('village', 2, '{"name":"إيجارات كرم فيلج","company":"","cr":"","vat":"","addr":"","prefix":"KV"}'),
- ('realestate', 3, '{"name":"إيجارات كرم العقارية","company":"","cr":"","vat":"","addr":"","prefix":"KR"}')
+ ('village', 2, '{"name":"إيجارات كرم فيلج","company":"شركة مجمع كرم مول التجاري","cr":"1122005677","vat":"310154341300003","addr":"المجمعة - حي المستقبل - طريق الملك خالد","prefix":"KV"}'),
+ ('realestate', 3, '{"name":"إيجارات كرم العقارية","company":"شركة كرم العربية العقارية","cr":"1122005091","vat":"310719783200003","addr":"","prefix":"KR","logo":"logo-realestate.png"}')
 on conflict (id) do nothing;
 
 -- 2) ربط العقود والمطالبات بالمشروع (الحالي كله = المول)
