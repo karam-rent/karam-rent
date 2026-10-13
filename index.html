@@ -51,6 +51,10 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;backgroun
 .brand{display:flex;align-items:center;gap:10px;margin-inline-end:auto;min-width:0}
 .brand>div{display:flex;flex-direction:column;min-width:0}
 .brand .mark{width:38px;height:38px;object-fit:contain;flex:none}
+#projSel{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 8px;font-weight:600;color:var(--accent);max-width:200px}
+.projcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center}
+.projcard img{width:44px;height:44px;object-fit:contain;flex:none}
+.projcard .t{flex:1;min-width:0}.projcard .t small{display:block;color:var(--muted);font-size:12px}
 header.top{border-bottom:2px solid var(--brass)!important}
 .brand h1{font-family:var(--f-display);font-size:20px;margin:0;font-weight:700;letter-spacing:0}
 .brand span{color:var(--muted);font-size:12px}
@@ -199,7 +203,7 @@ h4{margin:0 0 8px;font-size:13px;font-family:var(--f-display);font-weight:600}
 <header class="top">
   <div class="wrap">
     <div class="bar">
-      <div class="brand"><img src="mark.png" alt="" class="mark"><div><h1>إيجارات كرم مول</h1><span id="today"></span></div></div>
+      <div class="brand"><img src="mark.png" alt="" class="mark" id="brandMark"><div><h1 id="projTitle">إيجارات كرم مول</h1><span id="today"></span></div><select id="projSel" hidden aria-label="المشروع"></select></div>
       <div class="sync"><span class="dot" id="dot"></span><span id="syncTxt">جارٍ الاتصال…</span></div>
       <span class="who" id="whoBox" hidden><span id="whoTxt"></span><button class="btn sm ghost" id="btnLogout">خروج</button></span>
       <button class="btn" id="btnShare" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-inline-end:4px"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M17 8v6M14 11h6"/></svg>المستخدمون</button>
@@ -329,7 +333,7 @@ const addM=(s,m)=>{const d=parse(s);const day=d.getDate();d.setDate(1);d.setMont
 const fd=s=>{if(!s)return '—';const [y,m,d]=s.split('-');return d+'/'+m+'/'+y};
 const MONTHS=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-$('#today').textContent='شركة مجمع كرم مول التجاري · '+fd(TODAY);
+$('#today').textContent=fd(TODAY);
 
 const tById=id=>tenants.find(t=>t.id===id);
 const paidOf=d=>(d.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
@@ -415,6 +419,28 @@ const PERM_LIST=[['edit_dues','المطالبات والدفعات','إضافة 
 const ROLE_DEF={admin:{edit_dues:1,edit_contracts:1,discount:1,delete:1,users:1},editor:{edit_dues:1,edit_contracts:1},viewer:{}};
 function permsOf(u){if(!u)return {};if(u.role==='admin')return {...ROLE_DEF.admin};const src=u.perms||ROLE_DEF[u.role]||{};const o={};PERM_LIST.forEach(([k])=>o[k]=!!src[k]);return o}
 let PERMS={};
+let PROJECTS=[],CUR=null,PROJ_NAME='',MY_PROJ=null;
+const PKEY='krc-proj';
+function projAllowed(id){return PERMS.users||!MY_PROJ||MY_PROJ.includes(id)}
+async function loadProjects(){
+  const {data,error}=await sb.from('projects').select('id,data,sort').order('sort');
+  if(error)return false;
+  PROJECTS=(data||[]).filter(p=>projAllowed(p.id));
+  if(!PROJECTS.length)return 'none';
+  let saved=null;try{saved=localStorage.getItem(PKEY)}catch(e){}
+  CUR=PROJECTS.some(p=>p.id===saved)?saved:PROJECTS[0].id;
+  applyProject();return true;
+}
+function applyProject(){
+  const pr=PROJECTS.find(p=>p.id===CUR);if(!pr)return;const d=pr.data||{};
+  PROJ_NAME=d.name||pr.id;
+  CO={name:d.company||'',cr:d.cr||'',vat:d.vat||'',addr:d.addr||'',prefix:d.prefix||'KM',logo:d.logo||'logo.png'};
+  $('#projTitle').textContent=PROJ_NAME;document.title=PROJ_NAME;
+  $('#brandMark').src=d.logo||'mark.png';
+  const sel=$('#projSel');sel.innerHTML=PROJECTS.map(p=>`<option value="${esc(p.id)}" ${p.id===CUR?'selected':''}>${esc((p.data||{}).name||p.id)}</option>`).join('')+(PERMS.users?'<option value="__manage">⚙ إدارة المشاريع…</option>':'');
+  sel.hidden=PROJECTS.length<2&&!PERMS.users;$('#projTitle').hidden=!sel.hidden;
+  sel.onchange=()=>{if(sel.value==='__manage'){sel.value=CUR;openProjects();return}try{localStorage.setItem(PKEY,sel.value)}catch(e){}location.reload()};
+}
 let sb=null, MY_ROLE=null, MY_EMAIL='', started=false;
 const ROLES={admin:['مدير','p-acc'],editor:['محرر','p-paid'],viewer:['مشاهد','p-up']};
 let authMode='login';
@@ -460,8 +486,10 @@ async function bootSupabase(){
 async function startSession(session){
   if(started)return;started=true;hideAuth();
   MY_EMAIL=(session.user.email||'').toLowerCase();
-  let {data:u,error:ue}=await sb.from('app_users').select('role,perms').eq('email',MY_EMAIL).maybeSingle();
+  let {data:u,error:ue}=await sb.from('app_users').select('role,perms,projects').eq('email',MY_EMAIL).maybeSingle();
+  if(ue&&/projects/.test(ue.message||'')){({data:u,error:ue}=await sb.from('app_users').select('role,perms').eq('email',MY_EMAIL).maybeSingle())}
   if(ue&&/perms/.test(ue.message||'')){({data:u,error:ue}=await sb.from('app_users').select('role').eq('email',MY_EMAIL).maybeSingle())}
+  MY_PROJ=u&&Array.isArray(u.projects)?u.projects:null;
   if(ue){$('#whoBox').hidden=false;$('#whoTxt').textContent=MY_EMAIL;const n=$('#noDb');n.hidden=false;n.textContent='قاعدة البيانات غير مجهزة بعد: شغّل ملف 1_schema.sql ثم 2_seed.sql في Supabase ← SQL Editor، ثم أعد تحميل الصفحة. ('+ue.message+')';$('#syncTxt').textContent='غير مجهزة';$('#btnNewDue').hidden=true;$('#btnNewTenant').hidden=true;return}
   MY_ROLE=u?u.role:null;
   $('#whoBox').hidden=false;$('#whoTxt').textContent=MY_EMAIL+(MY_ROLE?' · '+ROLES[MY_ROLE][0]:'');
@@ -470,16 +498,18 @@ async function startSession(session){
   const rc=document.documentElement.classList;rc.toggle('np-dues',!PERMS.edit_dues);rc.toggle('np-contracts',!PERMS.edit_contracts);rc.toggle('np-discount',!PERMS.discount);rc.toggle('np-delete',!PERMS.delete);
   if(!canWrite){const n=$('#noDb');n.hidden=false;n.textContent='صلاحيتك عرض فقط. لطلب صلاحيات إضافية تواصل مع مدير النظام.'}
   if(PERMS.users){const b=$('#btnShare');b.hidden=false;b.onclick=openUsers}
+  const pj=await loadProjects();
+  if(pj==='none'){const n=$('#noDb');n.hidden=false;n.textContent='لا توجد مشاريع مسموحة لحسابك. تواصل مع مدير النظام.';return}
   db={collection:col=>({onSnapshot:()=>()=>{},doc:id=>({
-    set:async d=>{const {error}=await sb.from(col).upsert({id,data:d});if(error)throw{code:error.code==='42501'||/row-level security/i.test(error.message)?'invalid_argument':'server',message:error.message}},
+    set:async d=>{const row={id,data:d};if(CUR)row.project=CUR;const {error}=await sb.from(col).upsert(row);if(error)throw{code:error.code==='42501'||/row-level security/i.test(error.message)?'invalid_argument':'server',message:error.message}},
     delete:async()=>{const {error}=await sb.from(col).delete().eq('id',id);if(error)throw{code:'server',message:error.message}}})})};
   await loadAll(true);
   let t;const again=()=>{clearTimeout(t);t=setTimeout(()=>loadAll(false),400)};
-  sb.channel('rent-db').on('postgres_changes',{event:'*',schema:'public',table:'tenants'},again).on('postgres_changes',{event:'*',schema:'public',table:'dues'},again).subscribe();
+  const flt=CUR?{filter:'project=eq.'+CUR}:{};sb.channel('rent-db').on('postgres_changes',{event:'*',schema:'public',table:'tenants',...flt},again).on('postgres_changes',{event:'*',schema:'public',table:'dues',...flt},again).subscribe();
   setInterval(()=>{if(!document.hidden)loadAll(false)},120000);
   if(window.XLSX){const b=$('#btnExport');b.hidden=false;b.onclick=()=>exportXlsx(null)}
 }
-async function fetchAll(t){let out=[],from=0;for(;;){const {data,error}=await sb.from(t).select('id,data').range(from,from+999);if(error)throw error;out=out.concat(data.map(r=>({...r.data,id:r.id})));if(data.length<1000)break;from+=1000}return out}
+async function fetchAll(t,allProjects){let out=[],from=0;for(;;){let q=sb.from(t).select(allProjects&&CUR?'id,data,project':'id,data');if(CUR&&!allProjects)q=q.eq('project',CUR);const {data,error}=await q.range(from,from+999);if(error)throw error;out=out.concat(data.map(r=>({...r.data,id:r.id,...(r.project&&allProjects?{project:r.project}:{})})));if(data.length<1000)break;from+=1000}return out}
 async function loadAll(first){
   try{const [a,b]=await Promise.all([fetchAll('tenants'),fetchAll('dues')]);tenants=a;dues=b;ready.t=ready.d=true;
     $('#dot').classList.add('on');$('#syncTxt').textContent='متصل — '+new Date().toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});render()}
@@ -492,30 +522,61 @@ function openUsers(){
     <label style="justify-content:flex-end"><button class="btn pri" id="uAdd" type="button">إضافة مستخدم</button></label></div>
     <div><h4>المستخدمون</h4><div id="uList" style="display:flex;flex-direction:column;gap:8px"><div class="empty">جارٍ التحميل…</div></div></div>
     <div class="legend" style="display:block;line-height:1.8">بعد الإضافة أرسل للمستخدم رابط النظام. أول مرة يضغط «أول مرة؟ أنشئ كلمة مرور» ويستخدم نفس البريد. أي تغيير في الصلاحيات يسري عند دخوله القادم أو تحديث الصفحة.</div>`,
-    `<button class="btn" id="uAudit">سجل التعديلات</button><button class="btn" id="uBackup">نسخة احتياطية</button><button class="btn" id="uCopy">نسخ رابط النظام</button>`);
-  const paint=async()=>{let {data,error}=await sb.from('app_users').select('email,role,perms').order('created_at');
-    if(error&&/perms/.test(error.message||'')){({data,error}=await sb.from('app_users').select('email,role').order('created_at'));if(!error)toast('لتفعيل الصلاحيات المخصصة شغّل ملف 3_permissions.sql في Supabase')}
+    `${PROJECTS.length?'<button class="btn" id="uProj">المشاريع</button>':''}<button class="btn" id="uAudit">سجل التعديلات</button><button class="btn" id="uBackup">نسخة احتياطية</button><button class="btn" id="uCopy">نسخ رابط النظام</button>`);
+  const paint=async()=>{let {data,error}=await sb.from('app_users').select('*').order('created_at');
     if(error){$('#uList').innerHTML='<div class="empty">'+esc(error.message)+'</div>';return}
     $('#uList').innerHTML=data.map(u=>{const me=u.email===MY_EMAIL;const pr=permsOf(u);const mode=u.role==='admin'?'admin':u.perms?'custom':u.role;
       return `<div class="ucard" data-u="${esc(u.email)}"><div class="top"><b>${esc(u.email)}</b>${me?`<span class="pill ${ROLES[u.role][1]}">${ROLES[u.role][0]} (أنت)</span>`:`<select data-mode>${[['admin','مدير'],['editor','محرر'],['viewer','مشاهد'],['custom','مخصص']].map(([k,v])=>`<option value="${k}" ${k===mode?'selected':''}>${v}</option>`).join('')}</select><button class="btn sm danger" data-rm>إزالة</button>`}</div>
-        <div class="permgrid">${PERM_LIST.map(([k,l,h])=>`<label title="${esc(h)}"><input type="checkbox" data-p="${k}" ${pr[k]?'checked':''} ${me||mode!=='custom'?'disabled':''}> ${l}</label>`).join('')}</div></div>`}).join('');
+        <div class="permgrid">${PERM_LIST.map(([k,l,h])=>`<label title="${esc(h)}"><input type="checkbox" data-p="${k}" ${pr[k]?'checked':''} ${me||mode!=='custom'?'disabled':''}> ${l}</label>`).join('')}</div>
+        ${PROJECTS.length>1&&u.role!=='admin'?`<div class="permgrid" style="border-top:1px dashed var(--line)"><label><input type="checkbox" data-allp ${!Array.isArray(u.projects)?'checked':''}> <b>كل المشاريع</b></label>${PROJECTS.map(pj=>`<label><input type="checkbox" data-pj="${esc(pj.id)}" ${!Array.isArray(u.projects)||u.projects.includes(pj.id)?'checked':''} ${!Array.isArray(u.projects)?'disabled':''}> ${esc((pj.data||{}).name||pj.id)}</label>`).join('')}</div>`:''}</div>`}).join('');
     document.querySelectorAll('.ucard').forEach(c=>{const em=c.dataset.u;const sel=c.querySelector('[data-mode]');if(!sel)return;
       const save=async(patch,msg)=>{const {error}=await sb.from('app_users').update(patch).eq('email',em);toast(error?error.message:msg);paint()};
       sel.onchange=()=>{const m=sel.value;if(m==='custom'){const cur=permsOf({role:'editor'});save({role:'editor',perms:cur},'اختر الصلاحيات المطلوبة بالعلامات')}else save({role:m,perms:null},'تم تحديث الصلاحية')};
       c.querySelectorAll('[data-p]').forEach(cb=>cb.onchange=()=>{const o={};c.querySelectorAll('[data-p]').forEach(x=>o[x.dataset.p]=x.checked);save({role:o.users?'admin':'editor',perms:o.users?null:o},'تم حفظ الصلاحيات')});
+      const ap=c.querySelector('[data-allp]');if(ap){ap.onchange=()=>save({projects:ap.checked?null:[CUR]},ap.checked?'صار له وصول لكل المشاريع':'حدد المشاريع المسموحة');
+        c.querySelectorAll('[data-pj]').forEach(cb=>cb.onchange=()=>{const arr=[...c.querySelectorAll('[data-pj]')].filter(x=>x.checked).map(x=>x.dataset.pj);if(!arr.length){toast('اختر مشروعاً واحداً على الأقل');cb.checked=true;return}save({projects:arr},'تم تحديث المشاريع')})}
       c.querySelector('[data-rm]').onclick=async e=>{e.target.disabled=true;const {error}=await sb.from('app_users').delete().eq('email',em);toast(error?error.message:'تمت الإزالة');paint()};
     })};
   paint();
   $('#uAdd').onclick=async()=>{const m=val('uMail').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m)){toast('أدخل بريداً صحيحاً');return}
     const {error}=await sb.from('app_users').upsert({email:m,role:val('uRole'),perms:null});if(error){toast(error.message);return}$('#uMail').value='';toast('تمت إضافة '+m);paint()};
   $('#uCopy').onclick=()=>{const u=location.origin+location.pathname;Promise.resolve().then(()=>navigator.clipboard.writeText(u)).then(()=>toast('تم نسخ الرابط'),()=>toast(u))};
-  $('#uAudit').onclick=()=>openAudit();
+  $('#uAudit').onclick=()=>openAudit();if($('#uProj'))$('#uProj').onclick=()=>openProjects();
   $('#uBackup').onclick=()=>downloadBackup();
+}
+function openProjects(){
+  drawer('المشاريع',`<div class="legend" style="display:block;line-height:1.8">كل مشروع له عقوده ومطالباته وبيانات الشركة والشعار اللي تظهر في مستند المطالبة. التنقل بين المشاريع من القائمة أعلى الصفحة.</div>
+    <div id="pjList" style="display:flex;flex-direction:column;gap:8px">${PROJECTS.map(pj=>{const d=pj.data||{};return `<div class="projcard"><img src="${esc(d.logo||'mark.png')}" alt=""><div class="t"><b>${esc(d.name||pj.id)}</b><small>${d.company?esc(d.company)+(d.cr?' · س.ت '+esc(d.cr):''):'<span style="color:var(--bad)">بيانات الشركة غير مكتملة</span>'}</small></div><button class="btn sm" data-pe="${esc(pj.id)}">تعديل</button></div>`}).join('')}</div>`,
+    `<button class="btn pri" id="pjAdd">+ مشروع جديد</button><button class="btn" id="pjBack">رجوع للمستخدمين</button>`);
+  document.querySelectorAll('[data-pe]').forEach(b=>b.onclick=()=>projectForm(PROJECTS.find(p=>p.id===b.dataset.pe)));
+  $('#pjAdd').onclick=()=>projectForm(null);$('#pjBack').onclick=openUsers;
+}
+function projectForm(pj){
+  const isNew=!pj;const d=pj?{...(pj.data||{})}:{name:'',company:'',cr:'',vat:'',addr:'',prefix:''};
+  drawer(isNew?'مشروع جديد':'تعديل المشروع',`<div class="form">
+    <label class="full">اسم المشروع (يظهر في القائمة)<input id="pName" value="${esc(d.name||'')}" placeholder="مثال: إيجارات كرم فيلج"></label>
+    <label class="full">اسم الشركة (في المطالبات)<input id="pCo" value="${esc(d.company||'')}"></label>
+    <label>السجل التجاري<input id="pCr" value="${esc(d.cr||'')}" inputmode="numeric"></label>
+    <label>الرقم الضريبي<input id="pVat" value="${esc(d.vat||'')}" inputmode="numeric"></label>
+    <label class="full">العنوان<input id="pAddr" value="${esc(d.addr||'')}"></label>
+    <label>رمز ترقيم المطالبات (حروف إنجليزية)<input id="pPfx" value="${esc(d.prefix||'')}" placeholder="KV" dir="ltr" maxlength="6"></label>
+    <label>الشعار<input id="pLogo" type="file" accept="image/*"></label>
+    <div class="full" style="display:flex;align-items:center;gap:10px"><img id="pLogoPrev" src="${esc(d.logo||'logo.png')}" style="width:90px;height:90px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff">${d.logo?'<button class="btn sm" id="pLogoDel" type="button">استخدام الشعار الافتراضي</button>':''}</div></div>`,
+    `<button class="btn pri" id="pSave">حفظ</button><button class="btn" id="pCancel">رجوع</button>`);
+  let logo=d.logo||'';
+  $('#pLogo').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,400/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);logo=c.toDataURL('image/png');$('#pLogoPrev').src=logo};im.src=rd.result};rd.readAsDataURL(f)};
+  if($('#pLogoDel'))$('#pLogoDel').onclick=()=>{logo='';$('#pLogoPrev').src='logo.png'};
+  $('#pCancel').onclick=openProjects;
+  $('#pSave').onclick=async()=>{const name=val('pName');if(!name){toast('اكتب اسم المشروع');return}
+    const nd={name,company:val('pCo'),cr:val('pCr'),vat:val('pVat'),addr:val('pAddr'),prefix:(val('pPfx')||'').toUpperCase().replace(/[^A-Z0-9]/g,'')};if(logo)nd.logo=logo;
+    const id=isNew?'p'+Date.now().toString(36):pj.id;const sort=isNew?(Math.max(0,...PROJECTS.map(x=>x.sort||0))+1):pj.sort;
+    const {error}=await sb.from('projects').upsert({id,data:nd,sort});if(error){toast(error.message);return}
+    toast('تم حفظ المشروع');await loadProjects();if(!isNew&&id===CUR)applyProject();openProjects()};
 }
 function downloadFile(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
 async function downloadBackup(){
-  try{const [t,d,u]=await Promise.all([fetchAll('tenants'),fetchAll('dues'),sb.from('app_users').select('email,role,perms').then(r=>r.data||[])]);
-    downloadFile('نسخة احتياطية إيجارات كرم مول '+TODAY+'.json',JSON.stringify({system:'karam-rent',exported_at:new Date().toISOString(),by:MY_EMAIL,tenants:t,dues:d,users:u},null,1),'application/json');
+  try{const [t,d,u,pj]=await Promise.all([fetchAll('tenants',true),fetchAll('dues',true),sb.from('app_users').select('*').then(r=>r.data||[]),sb.from('projects').select('*').then(r=>r.data||[])]);
+    downloadFile('نسخة احتياطية إيجارات كرم '+TODAY+'.json',JSON.stringify({system:'karam-rent',exported_at:new Date().toISOString(),by:MY_EMAIL,projects:pj,tenants:t,dues:d,users:u},null,1),'application/json');
     if(window.XLSX)exportXlsx(null);toast('تم تنزيل النسخة الاحتياطية (JSON + Excel)')}catch(e){toast('تعذّر إنشاء النسخة: '+(e.message||e))}
 }
 const KEYL={amount:'المبلغ',stage:'المرحلة',stageDate:'تاريخ المرحلة',payments:'الدفعات',discount:'الخصم',nextDue:'الاستحقاق القادم',amendments:'تعديلات العقد',rent:'الإيجار',installment:'قيمة الدفعة',billing:'الفوترة',invNo:'رقم الفاتورة',closed:'الإغلاق',history:'السجل',notes:'الملاحظات',name:'الاسم',end:'نهاية العقد',start:'بداية العقد',dueDate:'تاريخ الاستحقاق',state:'حالة العقد',claimNo:'رقم المطالبة',phone:'الجوال',contact:'المسؤول',everyMonths:'الدورية',period:'الفترة'};
@@ -526,19 +587,19 @@ async function openAudit(filter){
     <div class="aud" id="audList"><div class="empty">جارٍ التحميل…</div></div>`,`<button class="btn" id="audBack">رجوع للمستخدمين</button>`);
   $('#audBack').onclick=openUsers;
   document.querySelectorAll('#audChips .chip').forEach(c=>c.onclick=()=>openAudit(c.dataset.f));
-  let q=sb.from('audit_log').select('id,at,email,tbl,row_id,action,before,after').order('at',{ascending:false}).limit(300);
+  let q=sb.from('audit_log').select('*').order('at',{ascending:false}).limit(300);
   if(filter!=='all')q=q.eq('action',filter);
   const {data,error}=await q;
   if(error){$('#audList').innerHTML='<div class="empty">'+(/audit_log/.test(error.message)?'سجل التعديلات غير مفعّل بعد — شغّل ملف 3_permissions.sql في Supabase.':esc(error.message))+'</div>';return}
   if(!data.length){$('#audList').innerHTML='<div class="empty">لا توجد سجلات بعد.</div>';return}
-  const AL={insert:['إضافة','p-paid'],update:['تعديل','p-up'],delete:['حذف','p-late']};
+  const AL={insert:['إضافة','p-paid'],update:['تعديل','p-up'],delete:['حذف','p-late']};const PN=id=>{const x=PROJECTS.find(p=>p.id===id);return x?(x.data||{}).name||id:''};
   $('#audList').innerHTML=data.map(r=>{const o=r.after||r.before||{};const nm=o.name||o.tenantName||r.row_id;
     const keys=r.action==='update'?Object.keys({...(r.before||{}),...(r.after||{})}).filter(k=>k!=='history'&&JSON.stringify((r.before||{})[k])!==JSON.stringify((r.after||{})[k])).map(k=>KEYL[k]||k):[];
     const dt=new Date(r.at);
-    return `<div class="r"><span class="pill ${AL[r.action][1]}">${AL[r.action][0]}</span><div><b style="font-weight:500">${esc(nm)}</b>${r.tbl==='dues'&&o.period?' <small style="display:inline">'+esc(o.period)+'</small>':''}<small>${r.tbl==='tenants'?'عقد':'مطالبة'} · ${esc(r.email||'')} · ${fd(iso(dt))} ${pad(dt.getHours())}:${pad(dt.getMinutes())}${keys.length?' · '+esc(keys.join('، ')):''}</small></div>
+    return `<div class="r"><span class="pill ${AL[r.action][1]}">${AL[r.action][0]}</span><div><b style="font-weight:500">${esc(nm)}</b>${r.tbl==='dues'&&o.period?' <small style="display:inline">'+esc(o.period)+'</small>':''}<small>${r.project&&PROJECTS.length>1?esc(PN(r.project))+' · ':''}${r.tbl==='tenants'?'عقد':'مطالبة'} · ${esc(r.email||'')} · ${fd(iso(dt))} ${pad(dt.getHours())}:${pad(dt.getMinutes())}${keys.length?' · '+esc(keys.join('، ')):''}</small></div>
       <div>${r.before&&PERMS.users?`<button class="btn sm" data-rest="${r.id}">استرجاع</button>`:''}</div></div>`}).join('');
   document.querySelectorAll('[data-rest]').forEach(btn=>btn.onclick=async()=>{const r=data.find(x=>String(x.id)===btn.dataset.rest);if(!r)return;btn.disabled=true;
-    const {error}=await sb.from(r.tbl).upsert({id:r.row_id,data:r.before});
+    const row={id:r.row_id,data:r.before};if(CUR)row.project=r.project||CUR;const {error}=await sb.from(r.tbl).upsert(row);
     if(error){toast(error.message);btn.disabled=false;return}toast('تم الاسترجاع');await loadAll(false);openAudit(filter)});
 }
 
@@ -783,10 +844,10 @@ function openStage(id,preset){
     if(await put('dues',nd)){toast(moved?'تم النقل إلى '+st:'تم تسجيل المتابعة');openDue(id)}};
 }
 /* ---------- claim document (PDF / Word) ---------- */
-const CO={name:'شركة مجمع كرم مول التجاري',cr:'1122005677',vat:'310154341300003',addr:'المجمعة - حي المستقبل - طريق الملك خالد'};
+let CO={name:'شركة مجمع كرم مول التجاري',cr:'1122005677',vat:'310154341300003',addr:'المجمعة - حي المستقبل - طريق الملك خالد',prefix:'KM',logo:'logo.png'};
 const ARD=n=>String(n).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);
 function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector('script[src="'+src+'"]'))return res();const e=document.createElement('script');e.src=src;e.onload=res;e.onerror=()=>rej(new Error('تعذّر تحميل المكتبة'));document.head.appendChild(e)})}
-function nextClaimNo(){const y=TODAY.slice(0,4);let mx=0;dues.forEach(d=>{const m=/^KM-(\d{4})-(\d+)$/.exec(d.claimNo||'');if(m&&m[1]===y)mx=Math.max(mx,+m[2])});return 'KM-'+y+'-'+String(mx+1).padStart(4,'0')}
+function nextClaimNo(){const y=TODAY.slice(0,4),px=(CO.prefix||'KM').replace(/[^A-Za-z0-9]/g,'')||'KM';const re=new RegExp('^'+px+'-(\\d{4})-(\\d+)$');let mx=0;dues.forEach(d=>{const m=re.exec(d.claimNo||'');if(m&&m[1]===y)mx=Math.max(mx,+m[2])});return px+'-'+y+'-'+String(mx+1).padStart(4,'0')}
 function claimData(d){
   const t=tById(d.tenantId)||{};const gross=+d.amount||0,disc=discOf(d),amt=netOf(d),paid=paidOf(d),rem=remOf(d);
   const base=r2(amt/1.15),vat=r2(amt-base);
@@ -800,7 +861,7 @@ function letterHTML(d){
   <div style="display:flex;justify-content:space-between;align-items:center;gap:20px">
     <div><div style="font-size:19px;font-weight:700;color:${C}">${CO.name}</div>
       <div style="font-size:12px;color:#555">سجل تجاري: ${CO.cr}<br>الرقم الضريبي: ${CO.vat}<br>${CO.addr}</div></div>
-    <img src="logo.png" style="width:120px">
+    <img src="${esc(CO.logo||'logo.png')}" style="width:120px;max-height:120px;object-fit:contain">
   </div>
   <div style="height:3px;background:${G};margin:16px 0 22px"></div>
   <div style="display:flex;justify-content:space-between;align-items:flex-end">
@@ -830,7 +891,7 @@ function letterHTML(d){
 async function openDoc(id){
   let d=dues.find(x=>x.id===id);if(!d)return;
   if(!d.claimNo&&canWrite!==false){const nd={...d,claimNo:nextClaimNo(),claimDate:TODAY,history:[...(d.history||[]),{date:TODAY,stage:'إصدار مستند مطالبة',note:''}]};nd.history[nd.history.length-1].note='رقم '+nd.claimNo;if(await put('dues',nd))d=dues.find(x=>x.id===id)||nd}
-  drawer('مستند المطالبة — '+esc(d.tenantName),`<div class="legend" style="display:block">معاينة المستند. لحفظه PDF اضغط «PDF / طباعة» واختر «حفظ كـ PDF» من نافذة الطباعة، أو حمّله Word للتعديل.</div>
+  drawer('مستند المطالبة — '+esc(d.tenantName),`${!CO.name||!CO.cr?'<div class="notice">بيانات الشركة لهذا المشروع غير مكتملة — أكملها من المستخدمون ← المشاريع قبل إرسال المطالبة.</div>':''}<div class="legend" style="display:block">معاينة المستند. لحفظه PDF اضغط «PDF / طباعة» واختر «حفظ كـ PDF» من نافذة الطباعة، أو حمّله Word للتعديل.</div>
     <div style="overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fff"><div style="width:794px;transform:scale(.6);transform-origin:top right;height:${Math.round(1123*.6)}px">${letterHTML(d)}</div></div>`,
     `<button class="btn pri" id="docPdf">PDF / طباعة</button><button class="btn" id="docWord">تحميل Word</button>${canWrite!==false&&billOf(d)!=='sent'?'<button class="btn" id="docSent">تم الإرسال للعميل</button>':''}<button class="btn ghost" id="docBack" style="margin-inline-start:auto">رجوع</button>`);
   const fname='مطالبة '+(d.claimNo||'')+' - '+d.tenantName.slice(0,40);
@@ -855,7 +916,8 @@ function printLetter(d,fname){
 async function exportWord(d,fname){
   await loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js');
   const X=window.docx,c=claimData(d),t=c.t;const F='Arial',C='1F0B4A',G='A87C3D';
-  const logo=await (await fetch('logo.png')).arrayBuffer();
+  const logoUrl=CO.logo||'logo.png';const logo=await (await fetch(logoUrl)).arrayBuffer();
+  const dim=await new Promise(r=>{const im=new Image();im.onload=()=>r([im.naturalWidth||1,im.naturalHeight||1]);im.onerror=()=>r([1,1]);im.src=logoUrl});const lw=110,lh=Math.round(110*dim[1]/dim[0]);
   const R=(text,o={})=>new X.TextRun({text:String(text),font:F,rightToLeft:true,size:o.size||22,bold:!!o.bold,color:o.color});
   const P=(runs,o={})=>new X.Paragraph({bidirectional:true,alignment:o.align||X.AlignmentType.LEFT,spacing:{after:o.after??120,before:o.before||0},children:Array.isArray(runs)?runs:[runs],border:o.border});
   const cell=(text,o={})=>new X.TableCell({width:{size:o.w||3000,type:X.WidthType.DXA},shading:o.fill?{fill:o.fill,type:X.ShadingType.CLEAR,color:'auto'}:undefined,margins:{top:80,bottom:80,left:120,right:120},
@@ -872,7 +934,7 @@ async function exportWord(d,fname){
     children:[
       new X.Table({visuallyRightToLeft:true,width:{size:9000,type:X.WidthType.DXA},borders:X.TableBorders.NONE,rows:[new X.TableRow({children:[
         new X.TableCell({width:{size:6000,type:X.WidthType.DXA},borders:{top:{style:'none'},bottom:{style:'none'},left:{style:'none'},right:{style:'none'}},children:[P(R(CO.name,{bold:1,size:30,color:C}),{after:40}),P(R('سجل تجاري: '+CO.cr,{size:19,color:'555555'}),{after:0}),P(R('الرقم الضريبي: '+CO.vat,{size:19,color:'555555'}),{after:0}),P(R(CO.addr,{size:19,color:'555555'}),{after:0})]}),
-        new X.TableCell({width:{size:3000,type:X.WidthType.DXA},borders:{top:{style:'none'},bottom:{style:'none'},left:{style:'none'},right:{style:'none'}},children:[new X.Paragraph({alignment:X.AlignmentType.LEFT,children:[new X.ImageRun({data:logo,transformation:{width:110,height:102}})]})]})]})]}),
+        new X.TableCell({width:{size:3000,type:X.WidthType.DXA},borders:{top:{style:'none'},bottom:{style:'none'},left:{style:'none'},right:{style:'none'}},children:[new X.Paragraph({alignment:X.AlignmentType.LEFT,children:[new X.ImageRun({data:logo,transformation:{width:lw,height:Math.min(lh,140)}})]})]})]})]}),
       P(R(''),{after:200,border:{bottom:{color:G,space:1,style:X.BorderStyle.SINGLE,size:18}}}),
       P(R('مطالبة مالية',{bold:1,size:40,color:C}),{after:60}),
       P([R('رقم المطالبة: ',{size:21}),R(c.no,{bold:1,size:21}),R('     التاريخ: ',{size:21}),R(fd(c.date),{bold:1,size:21})].concat(c.inv?[R('     رقم الفاتورة: ',{size:21}),R(c.inv,{bold:1,size:21})]:[]),{after:240}),
@@ -1040,7 +1102,7 @@ async function exportXlsx(dl){
   const P=[];dues.forEach(d=>(d.payments||[]).forEach(p=>P.push({'المستأجر':d.tenantName,'الفترة':d.period,'التاريخ':p.date,'المبلغ':+p.amount,'الطريقة':p.method,'ملاحظة':p.note})));
   [[D,'المطالبات'],[T,'العقود'],[P,'الدفعات المستلمة']].forEach(([rows,n])=>{const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{'':''}]);ws['!views']=[{RTL:true}];XLSX.utils.book_append_sheet(wb,ws,n)});
   wb.Workbook={Views:[{RTL:true}]};
-  if(!dl){try{XLSX.writeFile(wb,'إيجارات كرم مول '+TODAY+'.xlsx')}catch(e){toast('تعذّر تصدير الملف')}return}
+  if(!dl){try{XLSX.writeFile(wb,(PROJ_NAME||'إيجارات كرم مول')+' '+TODAY+'.xlsx')}catch(e){toast('تعذّر تصدير الملف')}return}
   const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
   try{await dl.save({filename:'إيجارات كرم مول '+TODAY+'.xlsx',data:new Blob([buf])});}catch(e){if(e&&e.code!=='declined')toast('تعذّر تصدير الملف')}
 }
