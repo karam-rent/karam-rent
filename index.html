@@ -938,7 +938,7 @@ function rTen(){
     if(ui.tenF==='active'&&s!=='active')return false; if(ui.tenF==='exp'&&!expSoon(t))return false;
     if(ui.tenF==='new'&&!(isNew(t)&&s!=='evicted'))return false; if(['pending','ended','evicted'].includes(ui.tenF)&&s!==ui.tenF)return false;
     if(ui.tenF==='debt'&&tenantOpen(t.id)<=0)return false;
-    if(q&&!((t.name||'')+' '+(t.contact||'')+' '+(t.phone||'')+' '+(t.unit||'')+' '+(t.contractNo||'')).includes(q))return false; return true});
+    if(q&&!((t.name||'')+' '+(t.contact||'')+' '+(t.phone||'')+' '+(t.unit||'')+' '+(t.contractNo||'')+' '+(t.aliases||[]).join(' ')).includes(q))return false; return true});
   // month bar
   const bs=$('#tenBasis');bs.value=ui.tenBasis;bs.onchange=()=>{ui.tenBasis=bs.value;saveUi();render()};
   const ML=monthList();if(ui.tenMonth&&!ML.some(m=>m.ym===ui.tenMonth))ui.tenMonth='';
@@ -1230,7 +1230,7 @@ function openTenant(id){
   const t=tById(id);if(!t)return;current={t:'ten',id};
   const ds=dues.filter(d=>d.tenantId===id).sort((a,b)=>b.dueDate.localeCompare(a.dueDate));
   drawer(esc(t.name),`<div style="display:flex;gap:8px;flex-wrap:wrap">${cPill(t)}</div>
-    <dl class="dl"><dt>رقم العقد</dt><dd class="num">${t.contractNo?'<span class="copy" data-copy="'+esc(t.contractNo)+'">'+esc(t.contractNo)+'</span>':'—'}</dd><dt>رقم المستأجر / المحل</dt><dd>${t.no||''}${t.unit?' — '+esc(t.unit):''}</dd><dt>الإجمالي السنوي شامل الضريبة</dt><dd class="num">${fmt(curRent(t))}${hasAm(t)&&curRent(t)!==(+t.rent||0)?' <small>(الأصلي في العقد '+fmt(t.rent)+')</small>':''}${svcOf(t)?'<br><small>'+rentSplit(t)+'</small>':''}</dd>
+    ${(t.aliases||[]).length?'<div class="legend" style="display:block;margin-top:6px">يُعرف أيضاً باسم: <b>'+t.aliases.map(esc).join('، ')+'</b></div>':''}<dl class="dl"><dt>رقم العقد</dt><dd class="num">${t.contractNo?'<span class="copy" data-copy="'+esc(t.contractNo)+'">'+esc(t.contractNo)+'</span>':'—'}</dd><dt>رقم المستأجر / المحل</dt><dd>${t.no||''}${t.unit?' — '+esc(t.unit):''}</dd><dt>الإجمالي السنوي شامل الضريبة</dt><dd class="num">${fmt(curRent(t))}${hasAm(t)&&curRent(t)!==(+t.rent||0)?' <small>(الأصلي في العقد '+fmt(t.rent)+')</small>':''}${svcOf(t)?'<br><small>'+rentSplit(t)+'</small>':''}</dd>
     <dt>قيمة الدفعة</dt><dd class="num">${fmt(instAt(t,TODAY))} — كل ${t.everyMonths||12} شهر${t.nextDue&&instAt(t,t.nextDue)!==instAt(t,TODAY)?' <small>(دفعة '+fd(t.nextDue)+': '+fmt(instAt(t,t.nextDue))+')</small>':''}</dd><dt>الدفعة القادمة</dt><dd>${fd(nextPay(t))}${issuedOpen(t).length&&nextPay(t)!==t.nextDue?' <small>(صدرت مطالبتها — الدفعة التي بعدها '+fd(t.nextDue)+')</small>':''}</dd>
     <dt>مدة العقد</dt><dd>${fd(t.start)} ← ${fd(t.end)}</dd><dt>رصيد مفتوح</dt><dd class="num"><b>${fmt(tenantOpen(id))}</b></dd>
     <dt>المسؤول</dt><dd>${esc(t.contact||'—')}</dd><dt>الجوال</dt><dd>${t.phone?'<span class="copy num" data-copy="'+esc(t.phone)+'">'+esc(t.phone)+'</span>':'—'}</dd>
@@ -1241,12 +1241,12 @@ function openTenant(id){
     ${remList('tenant',t.id)}
     <div><h4>المطالبات (${ds.length})</h4>${ds.length?`<div class="tbl"><table><thead><tr><th>الفترة</th><th>الاستحقاق</th><th>المتبقي</th><th>الحالة</th><th>الفوترة</th><th>المرحلة</th></tr></thead><tbody>${ds.map(d=>`<tr data-d="${d.id}"><td>${esc(d.period||'')}</td><td class="n">${fd(d.dueDate)}</td><td class="n">${fmt(remOf(d))}</td><td>${pill(dueStatus(d))}</td><td>${bPill(d)}</td><td>${dueStatus(d)==='paid'?'—':esc(d.stage||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">لا توجد مطالبات</div>'}</div>
     <div id="delBox"></div>`,
-    `${t.nextDue&&+t.installment?'<button class="btn pri" id="tIssue">إصدار مطالبة الدفعة القادمة</button>':''}<button class="btn" id="tEdit">تعديل العقد</button><button class="btn" id="tDue">مطالبة يدوية</button><button class="btn ghost danger" id="tDel" style="margin-inline-start:auto">حذف</button>`);
+    `${t.nextDue&&+t.installment?'<button class="btn pri" id="tIssue">إصدار مطالبة الدفعة القادمة</button>':''}<button class="btn" id="tEdit">تعديل العقد</button><button class="btn" id="tDue">مطالبة يدوية</button>${PERMS.edit_contracts&&PERMS.edit_dues&&PERMS.delete?'<button class="btn" id="tMerge">دمج مع عقد آخر</button>':''}<button class="btn ghost danger" id="tDel" style="margin-inline-start:auto">حذف</button>`);
   document.querySelectorAll('[data-d]').forEach(r=>r.onclick=()=>openDue(r.dataset.d));
   bindCopy();
   if($('#tIssue'))$('#tIssue').onclick=async()=>{await issue(id,$('#tIssue'));openTenant(id)};
   $('#tEdit').onclick=()=>tenantForm(t);bindRem('tenant',t.id,t.name,()=>openTenant(id));
-  $('#tAmend').onclick=()=>amendForm(id);bindDocs(id);
+  $('#tAmend').onclick=()=>amendForm(id);bindDocs(id);if($('#tMerge'))$('#tMerge').onclick=()=>mergeForm(id);
   document.querySelectorAll('[data-amdel]').forEach(b=>b.onclick=async()=>{const cur=tById(id);const nt={...cur,amendments:(cur.amendments||[]).filter(a=>a.id!==b.dataset.amdel)};if(await put('tenants',nt)){toast('تم حذف التعديل');openTenant(id)}});
   $('#tDue').onclick=()=>{dueForm(null);$('#fTen').value=id;$('#fAmt').value=instAt(t,t.nextDue||TODAY)||''};
   $('#tDel').onclick=()=>{$('#delBox').innerHTML=`<div class="confirm">حذف ملف المستأجر؟ مطالباته تبقى في السجل. <button class="btn sm danger" id="tDelY">نعم، احذف</button><button class="btn sm" id="tDelN">إلغاء</button></div>`;$('#tDelN').onclick=()=>$('#delBox').innerHTML='';$('#tDelY').onclick=async()=>{await del('tenants',id);close();toast('تم حذف الملف')}};
@@ -1287,6 +1287,31 @@ function bindDocs(id){
     $('#dcN').onclick=()=>$('#delBox').innerHTML='';
     $('#dcY').onclick=async()=>{const {error}=await sb.storage.from('contracts').remove([d.key]);if(error){toast(docErr(error));return}
       const cur=tById(id);if(await put('tenants',{...cur,docs:(cur.docs||[]).filter(x=>x.id!==d.id)})){toast('تم حذف المستند');openTenant(id)}}});
+}
+/* ---------- merge duplicate tenant files ---------- */
+function mergeForm(id){
+  const src=tById(id);if(!src)return;
+  const opts=tenants.filter(x=>x.id!==id).sort((a,b)=>a.name.localeCompare(b.name,'ar')).map(x=>`<option value="${x.id}">${esc(x.name)}${x.no?' ('+x.no+')':''}</option>`).join('');
+  const nd=dues.filter(d=>d.tenantId===id).length,nr=reminders.filter(r=>r.refType==='tenant'&&r.refId===id).length,nf=(src.docs||[]).length;
+  drawer('دمج «'+esc(src.name)+'» مع عقد آخر',`<div class="form">
+    <label class="full">العقد الصحيح الذي سيبقى<select id="mgT"><option value="">— اختر —</option>${opts}</select></label></div>
+    <div class="legend" style="display:block;line-height:1.9">سيتم نقل كل ما يخص «<b>${esc(src.name)}</b>» إلى العقد المختار:<br>
+    • ${nd} مطالبة (بمدفوعاتها ومراحلها وسجلها)<br>• ${nr} تذكير · ${nf} مستند<br>
+    ثم يُحذف ملف «${esc(src.name)}»، ويُحفظ اسمه كاسم آخر للعقد المختار، فالبحث به يوصلك للعقد الصحيح.<br>بيانات العقد المختار (الإيجار والتواريخ) لا تتغير.</div>
+    <div id="mgBox"></div>`,
+    `<button class="btn pri" id="mgGo">دمج</button><button class="btn" id="mgBack">رجوع</button>`);
+  $('#mgBack').onclick=()=>openTenant(id);
+  $('#mgGo').onclick=()=>{const tid=val('mgT');if(!tid){toast('اختر العقد الصحيح');return}const tgt=tById(tid);
+    $('#mgBox').innerHTML=`<div class="confirm">تأكيد دمج «${esc(src.name)}» داخل «${esc(tgt.name)}»؟ <button class="btn sm danger" id="mgY">نعم، ادمج</button><button class="btn sm" id="mgN">إلغاء</button></div>`;
+    $('#mgN').onclick=()=>$('#mgBox').innerHTML='';
+    $('#mgY').onclick=async()=>{$('#mgY').disabled=true;
+      const al=[...new Set([...(tgt.aliases||[]),src.name,...(src.aliases||[])].filter(n=>n&&n!==tgt.name))];
+      const note=(tgt.notes||'')+((tgt.notes||'')?'\n':'')+'دُمج معه ملف «'+src.name+'» بتاريخ '+fd(TODAY);
+      if(!await put('tenants',{...tgt,aliases:al,docs:[...(tgt.docs||[]),...(src.docs||[])],notes:note}))return;
+      for(const d of dues.filter(d=>d.tenantId===id)){if(!await put('dues',{...d,tenantId:tid,tenantName:tgt.name,history:[...(d.history||[]),{date:TODAY,stage:d.stage,note:'نُقلت من ملف «'+src.name+'» بعد الدمج'}]}))return}
+      for(const r of reminders.filter(r=>r.refType==='tenant'&&r.refId===id)){if(!await put('reminders',{...r,refId:tid,title:tgt.name}))return}
+      await del('tenants',id);
+      toast('تم الدمج');openTenant(tid)}};
 }
 function tenantForm(t){
   const isNew=!t;const nextNo=Math.max(0,...tenants.filter(x=>x.no<100).map(x=>+x.no||0))+1;
