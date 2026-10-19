@@ -201,7 +201,10 @@ h4{margin:0 0 8px;font-size:13px;font-family:var(--f-display);font-weight:600}
 .np-dues #btnNewDue,.np-dues [data-pay],.np-dues [data-stg],.np-dues [data-issue],.np-dues #dPay,.np-dues #dStg,.np-dues #dEdit,.np-dues #dBill,.np-dues #tIssue,.np-dues #tDue,.np-dues #docSent,.np-dues #dDisc,
 .np-contracts #btnNewTenant,.np-contracts #tEdit,.np-contracts #tAmend,.np-contracts [data-amdel],
 .np-discount #dDisc,.np-discount #tAmend,.np-discount [data-amdel],
-.np-delete #dDel,.np-delete #tDel{display:none!important}
+.np-delete #dDel,.np-delete #tDel,.np-delete [data-docdel]{display:none!important}
+.np-contracts #tDocAdd{display:none!important}
+.docs{display:flex;flex-direction:column;gap:6px}.doc{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}.doc .ic{font-size:20px}.doc .nm{flex:1;min-width:0;cursor:pointer;color:var(--ink)}.doc .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.doc .nm small{color:var(--muted);font-size:12px}.doc .nm:hover b{text-decoration:underline}
+.clip{font-size:12px;color:var(--muted);margin-inline-start:6px;white-space:nowrap}
 .permgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 12px;padding:8px 2px 2px}
 .permgrid label{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--fg);cursor:pointer}
 .permgrid input{width:auto}
@@ -373,6 +376,9 @@ function applyAm(a,st,t){
   return {rent,inst};
 }
 const curRent=t=>termsAt(t,TODAY).rent;
+const svcOf=t=>+t.services||0;
+const baseRent=t=>Math.max(0,r2((+t.rent||0)-svcOf(t)));
+const rentSplit=t=>svcOf(t)>0?'إيجار '+fmt(baseRent(t))+' + خدمات '+fmt(svcOf(t)):'';
 const instAt=(t,date)=>termsAt(t,date||TODAY).inst;
 const hasAm=t=>(t.amendments||[]).length>0;
 function dueStatus(d){
@@ -932,7 +938,7 @@ function rTen(){
     if(ui.tenF==='active'&&s!=='active')return false; if(ui.tenF==='exp'&&!expSoon(t))return false;
     if(ui.tenF==='new'&&!(isNew(t)&&s!=='evicted'))return false; if(['pending','ended','evicted'].includes(ui.tenF)&&s!==ui.tenF)return false;
     if(ui.tenF==='debt'&&tenantOpen(t.id)<=0)return false;
-    if(q&&!((t.name||'')+' '+(t.contact||'')+' '+(t.phone||'')+' '+(t.unit||'')).includes(q))return false; return true});
+    if(q&&!((t.name||'')+' '+(t.contact||'')+' '+(t.phone||'')+' '+(t.unit||'')+' '+(t.contractNo||'')).includes(q))return false; return true});
   // month bar
   const bs=$('#tenBasis');bs.value=ui.tenBasis;bs.onchange=()=>{ui.tenBasis=bs.value;saveUi();render()};
   const ML=monthList();if(ui.tenMonth&&!ML.some(m=>m.ym===ui.tenMonth))ui.tenMonth='';
@@ -946,7 +952,7 @@ function rTen(){
 function renderTenRows(l,MD,hl){
   const dueCell=t=>hl('due')?`<b>${fd(MD.get(t.id))}</b>`:fd(nextPay(t));
   const instFor=t=>{const dt=hl('due')?MD.get(t.id):(nextPay(t)||TODAY);const iss=dues.find(d=>d.tenantId===t.id&&d.dueDate===dt&&!d.closed);return iss?netOf(iss):instAt(t,dt)};
-  $('#tenRows').innerHTML=l.length?l.map(t=>{const o=tenantOpen(t.id);return `<tr data-id="${t.id}"><td class="n">${t.no||''}</td><td><span class="nm">${esc(t.name)}</span>${t.unit?'<span class="note">'+esc(t.unit)+'</span>':''}</td><td class="n">${fmt(curRent(t))}${hasAm(t)&&curRent(t)!==(+t.rent||0)?'<span class="note">معدّل (الأصلي '+fmt(t.rent)+')</span>':''}</td><td class="n">${fmt(instFor(t))}<span class="note">كل ${t.everyMonths||12} شهر</span></td><td class="n">${dueCell(t)}</td><td class="n">${hl('start')?'<b>'+fd(t.start)+'</b>':fd(t.start)}</td><td class="n">${hl('end')?'<b>'+fd(t.end)+'</b>':fd(t.end)}</td><td>${cPill(t)}</td><td class="n">${o>0?'<b style="color:var(--bad)">'+fmt(o)+'</b>':'—'}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${tenants.length?'لا توجد عقود بهذا التصفية.':emptyMsg()}</td></tr>`;
+  $('#tenRows').innerHTML=l.length?l.map(t=>{const o=tenantOpen(t.id);return `<tr data-id="${t.id}"><td class="n">${t.no||''}</td><td><span class="nm">${esc(t.name)}</span>${(t.docs||[]).length?'<span class="clip" title="مستندات مرفقة">📎 '+t.docs.length+'</span>':''}${t.unit||t.contractNo?'<span class="note">'+[t.unit?esc(t.unit):'',t.contractNo?'عقد '+esc(t.contractNo):''].filter(Boolean).join(' · ')+'</span>':''}</td><td class="n">${fmt(curRent(t))}${hasAm(t)&&curRent(t)!==(+t.rent||0)?'<span class="note">معدّل (الأصلي '+fmt(t.rent)+')</span>':''}${svcOf(t)?'<span class="note">منها خدمات '+fmt(svcOf(t))+'</span>':''}</td><td class="n">${fmt(instFor(t))}<span class="note">كل ${t.everyMonths||12} شهر</span></td><td class="n">${dueCell(t)}</td><td class="n">${hl('start')?'<b>'+fd(t.start)+'</b>':fd(t.start)}</td><td class="n">${hl('end')?'<b>'+fd(t.end)+'</b>':fd(t.end)}</td><td>${cPill(t)}</td><td class="n">${o>0?'<b style="color:var(--bad)">'+fmt(o)+'</b>':'—'}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${tenants.length?'لا توجد عقود بهذا التصفية.':emptyMsg()}</td></tr>`;
   $('#tenFoot').innerHTML=l.length?`<tr><td colspan="2">الإجمالي (${l.length})</td><td class="n">${fmt(l.reduce((a,t)=>a+curRent(t),0))}</td><td class="n">${fmt(l.reduce((a,t)=>a+instFor(t),0))}</td><td colspan="4">${hl('due')?'<span class="note">إجمالي الدفعات المستحقة في الشهر المختار</span>':''}</td><td class="n">${fmt(l.reduce((a,t)=>a+tenantOpen(t.id),0))}</td></tr>`:'';
   document.querySelectorAll('#tenRows tr[data-id]').forEach(tr=>tr.onclick=()=>openTenant(tr.dataset.id));
 }
@@ -1047,7 +1053,7 @@ function letterHTML(d){
     <div style="font-size:24px;font-weight:700;color:${C}">مطالبة مالية</div>
     <div style="font-size:12.5px;text-align:left;direction:rtl">رقم المطالبة: <b style="direction:ltr;unicode-bidi:embed">${esc(c.no)}</b><br>التاريخ: <b>${fd(c.date)}</b>${c.inv?'<br>رقم الفاتورة: <b>'+esc(c.inv)+'</b>':''}</div>
   </div>
-  <div style="margin-top:22px">السادة / <b>${esc(d.tenantName)}</b>&nbsp;&nbsp;المحترمين${t.contact?'<br>عناية: '+esc(t.contact):''}${t.unit?'<br>المحل: '+esc(t.unit):''}</div>
+  <div style="margin-top:22px">السادة / <b>${esc(d.tenantName)}</b>&nbsp;&nbsp;المحترمين${t.contact?'<br>عناية: '+esc(t.contact):''}${t.unit?'<br>المحل: '+esc(t.unit):''}${t.contractNo?'<br>رقم العقد: '+esc(t.contractNo):''}</div>
   <p style="margin:16px 0 6px">السلام عليكم ورحمة الله وبركاته،</p>
   <p style="margin:0 0 14px">نفيدكم بأن المبالغ الموضحة أدناه مستحقة عليكم بموجب عقد الإيجار المبرم معكم لدى كرم مول، ونأمل منكم المبادرة بسدادها في موعد أقصاه <b>${fd(c.payBy)}</b>.</p>
   <table style="width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px">
@@ -1120,6 +1126,7 @@ async function exportWord(d,fname){
       P([R('السادة / '),R(d.tenantName,{bold:1}),R('   المحترمين')],{after:40}),
       ...(t.contact?[P(R('عناية: '+t.contact),{after:40})]:[]),
       ...(t.unit?[P(R('المحل: '+t.unit),{after:40})]:[]),
+      ...(t.contractNo?[P(R('رقم العقد: '+t.contractNo),{after:40})]:[]),
       P(R('السلام عليكم ورحمة الله وبركاته،'),{before:200}),
       P([R('نفيدكم بأن المبالغ الموضحة أدناه مستحقة عليكم بموجب عقد الإيجار المبرم معكم لدى كرم مول، ونأمل منكم المبادرة بسدادها في موعد أقصاه '),R(fd(c.payBy),{bold:1}),R('.')],{after:200}),
       main,P(R(''),{after:120}),sum,
@@ -1223,13 +1230,14 @@ function openTenant(id){
   const t=tById(id);if(!t)return;current={t:'ten',id};
   const ds=dues.filter(d=>d.tenantId===id).sort((a,b)=>b.dueDate.localeCompare(a.dueDate));
   drawer(esc(t.name),`<div style="display:flex;gap:8px;flex-wrap:wrap">${cPill(t)}</div>
-    <dl class="dl"><dt>رقم العقد/المحل</dt><dd>${t.no||''}${t.unit?' — '+esc(t.unit):''}</dd><dt>الإيجار السنوي شامل الضريبة</dt><dd class="num">${fmt(curRent(t))}${hasAm(t)&&curRent(t)!==(+t.rent||0)?' <small>(الأصلي في العقد '+fmt(t.rent)+')</small>':''}</dd>
+    <dl class="dl"><dt>رقم العقد</dt><dd class="num">${t.contractNo?'<span class="copy" data-copy="'+esc(t.contractNo)+'">'+esc(t.contractNo)+'</span>':'—'}</dd><dt>رقم المستأجر / المحل</dt><dd>${t.no||''}${t.unit?' — '+esc(t.unit):''}</dd><dt>الإجمالي السنوي شامل الضريبة</dt><dd class="num">${fmt(curRent(t))}${hasAm(t)&&curRent(t)!==(+t.rent||0)?' <small>(الأصلي في العقد '+fmt(t.rent)+')</small>':''}${svcOf(t)?'<br><small>'+rentSplit(t)+'</small>':''}</dd>
     <dt>قيمة الدفعة</dt><dd class="num">${fmt(instAt(t,TODAY))} — كل ${t.everyMonths||12} شهر${t.nextDue&&instAt(t,t.nextDue)!==instAt(t,TODAY)?' <small>(دفعة '+fd(t.nextDue)+': '+fmt(instAt(t,t.nextDue))+')</small>':''}</dd><dt>الدفعة القادمة</dt><dd>${fd(nextPay(t))}${issuedOpen(t).length&&nextPay(t)!==t.nextDue?' <small>(صدرت مطالبتها — الدفعة التي بعدها '+fd(t.nextDue)+')</small>':''}</dd>
     <dt>مدة العقد</dt><dd>${fd(t.start)} ← ${fd(t.end)}</dd><dt>رصيد مفتوح</dt><dd class="num"><b>${fmt(tenantOpen(id))}</b></dd>
     <dt>المسؤول</dt><dd>${esc(t.contact||'—')}</dd><dt>الجوال</dt><dd>${t.phone?'<span class="copy num" data-copy="'+esc(t.phone)+'">'+esc(t.phone)+'</span>':'—'}</dd>
     <dt>البريد</dt><dd>${esc(t.email||'—')}</dd><dt>مهمة ClickUp</dt><dd>${t.link?`<a href="${esc(t.link)}" target="_blank" rel="noopener">فتح المهمة</a>`:'—'}</dd>
     ${t.notes?`<dt>ملاحظات</dt><dd>${esc(t.notes)}</dd>`:''}</dl>
     <div><h4 style="display:flex;align-items:center;gap:8px">تعديلات العقد (خصم / زيادة)<button class="btn sm" id="tAmend" style="margin-inline-start:auto">+ إضافة تعديل</button></h4>${amendList(t)}</div>
+    ${docList(t)}
     ${remList('tenant',t.id)}
     <div><h4>المطالبات (${ds.length})</h4>${ds.length?`<div class="tbl"><table><thead><tr><th>الفترة</th><th>الاستحقاق</th><th>المتبقي</th><th>الحالة</th><th>الفوترة</th><th>المرحلة</th></tr></thead><tbody>${ds.map(d=>`<tr data-d="${d.id}"><td>${esc(d.period||'')}</td><td class="n">${fd(d.dueDate)}</td><td class="n">${fmt(remOf(d))}</td><td>${pill(dueStatus(d))}</td><td>${bPill(d)}</td><td>${dueStatus(d)==='paid'?'—':esc(d.stage||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">لا توجد مطالبات</div>'}</div>
     <div id="delBox"></div>`,
@@ -1238,19 +1246,59 @@ function openTenant(id){
   bindCopy();
   if($('#tIssue'))$('#tIssue').onclick=async()=>{await issue(id,$('#tIssue'));openTenant(id)};
   $('#tEdit').onclick=()=>tenantForm(t);bindRem('tenant',t.id,t.name,()=>openTenant(id));
-  $('#tAmend').onclick=()=>amendForm(id);
+  $('#tAmend').onclick=()=>amendForm(id);bindDocs(id);
   document.querySelectorAll('[data-amdel]').forEach(b=>b.onclick=async()=>{const cur=tById(id);const nt={...cur,amendments:(cur.amendments||[]).filter(a=>a.id!==b.dataset.amdel)};if(await put('tenants',nt)){toast('تم حذف التعديل');openTenant(id)}});
   $('#tDue').onclick=()=>{dueForm(null);$('#fTen').value=id;$('#fAmt').value=instAt(t,t.nextDue||TODAY)||''};
   $('#tDel').onclick=()=>{$('#delBox').innerHTML=`<div class="confirm">حذف ملف المستأجر؟ مطالباته تبقى في السجل. <button class="btn sm danger" id="tDelY">نعم، احذف</button><button class="btn sm" id="tDelN">إلغاء</button></div>`;$('#tDelN').onclick=()=>$('#delBox').innerHTML='';$('#tDelY').onclick=async()=>{await del('tenants',id);close();toast('تم حذف الملف')}};
+}
+/* ---------- contract documents (Supabase Storage bucket "contracts") ---------- */
+const DOC_MAX=20*1024*1024;
+const docIcon=n=>/\.pdf$/i.test(n)?'📕':/\.(jpe?g|png|gif|webp|heic)$/i.test(n)?'🖼️':/\.(docx?|rtf)$/i.test(n)?'📘':/\.(xlsx?|csv)$/i.test(n)?'📗':'📄';
+const fsz=b=>b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';
+function docList(t){const L=(t.docs||[]).slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
+  return `<div><h4 style="display:flex;align-items:center;gap:8px">📎 مستندات العقد (${L.length})<button class="btn sm" id="tDocAdd" style="margin-inline-start:auto">+ إرفاق مستند</button><input type="file" id="tDocFile" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx"></h4>
+    <div class="docs">${L.length?L.map(d=>`<div class="doc"><span class="ic">${docIcon(d.name||'')}</span><div class="nm" data-docopen="${esc(d.id)}" title="فتح"><b>${esc(d.name||'مستند')}</b><small>${fsz(+d.size||0)} · ${d.at?fd(d.at.slice(0,10)):''}${d.by?' · '+esc(d.by.split('@')[0]):''}</small></div><button class="btn sm ghost" data-docopen="${esc(d.id)}">فتح</button><button class="btn sm ghost danger" data-docdel="${esc(d.id)}">حذف</button></div>`).join(''):'<div class="empty" style="padding:6px 0">لا توجد مستندات — أرفق العقد الموقّع أو أي مستند متعلق به (PDF أو صورة أو Word).</div>'}</div></div>`;
+}
+function docErr(e){const m=(e&&(e.message||e.error))||String(e);return /bucket not found|not found/i.test(m)?'خاصية المرفقات غير مفعّلة بعد — شغّل ملف 8_contract_docs.sql في Supabase':/row-level security|unauthorized|not allowed|403/i.test(m)?'لا تملك صلاحية على المستندات':m}
+function bindDocs(id){
+  const add=$('#tDocAdd'),inp=$('#tDocFile');if(!add||!inp)return;
+  add.onclick=()=>inp.click();
+  inp.onchange=async()=>{const files=[...inp.files];inp.value='';if(!files.length)return;
+    const big=files.filter(f=>f.size>DOC_MAX);if(big.length){toast('الملف أكبر من 20 ميجا: '+big[0].name);return}
+    add.disabled=true;add.textContent='جارٍ الرفع…';const added=[];
+    try{for(const f of files){
+        const ext=((f.name.match(/\.([a-z0-9]{1,6})$/i)||[])[1]||'bin').toLowerCase();
+        const key=CUR+'/'+id+'/'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)+'.'+ext;
+        const {error}=await sb.storage.from('contracts').upload(key,f,{contentType:f.type||'application/octet-stream',upsert:false});
+        if(error){toast(docErr(error));break}
+        added.push({id:uid('f'),key,name:f.name,size:f.size,type:f.type||'',at:new Date().toISOString(),by:MY_EMAIL});}
+      if(added.length){const cur=tById(id);if(await put('tenants',{...cur,docs:[...(cur.docs||[]),...added]}))toast(added.length>1?'تم إرفاق '+added.length+' مستندات':'تم إرفاق المستند')}}
+    finally{openTenant(id)}};
+  document.querySelectorAll('[data-docopen]').forEach(el=>el.onclick=async()=>{
+    const d=(tById(id).docs||[]).find(x=>x.id===el.dataset.docopen);if(!d)return;
+    const w=window.open('','_blank');
+    const {data,error}=await sb.storage.from('contracts').createSignedUrl(d.key,600);
+    if(error||!data){if(w)w.close();toast(docErr(error));return}
+    if(w)w.location.href=data.signedUrl;else location.href=data.signedUrl});
+  document.querySelectorAll('[data-docdel]').forEach(b=>b.onclick=()=>{
+    const d=(tById(id).docs||[]).find(x=>x.id===b.dataset.docdel);if(!d)return;
+    $('#delBox').innerHTML=`<div class="confirm">حذف المستند «${esc(d.name)}» نهائياً؟ <button class="btn sm danger" id="dcY">نعم، احذف</button><button class="btn sm" id="dcN">إلغاء</button></div>`;
+    $('#delBox').scrollIntoView({behavior:'smooth',block:'center'});
+    $('#dcN').onclick=()=>$('#delBox').innerHTML='';
+    $('#dcY').onclick=async()=>{const {error}=await sb.storage.from('contracts').remove([d.key]);if(error){toast(docErr(error));return}
+      const cur=tById(id);if(await put('tenants',{...cur,docs:(cur.docs||[]).filter(x=>x.id!==d.id)})){toast('تم حذف المستند');openTenant(id)}}});
 }
 function tenantForm(t){
   const isNew=!t;const nextNo=Math.max(0,...tenants.filter(x=>x.no<100).map(x=>+x.no||0))+1;
   t=t||{id:uid('t'),no:nextNo,name:'',unit:'',rent:'',installment:'',everyMonths:6,nextDue:'',start:'',end:'',contact:'',phone:'',email:'',link:'',state:'pending',notes:''};
   drawer(isNew?'عقد جديد':'تعديل العقد',`<div class="form">
     <label class="full">اسم المستأجر / المنشأة<input id="eName" value="${esc(t.name)}"></label>
+    <label>رقم العقد<input id="eCNo" dir="ltr" style="text-align:right" placeholder="مثال: 10045678912" value="${esc(t.contractNo||'')}"></label>
     <label>رقم المستأجر<input id="eNo" type="number" value="${t.no||''}"></label>
     <label>رقم المحل / الموقع<input id="eUnit" value="${esc(t.unit||'')}"></label>
-    <label>${hasAm(t)?'الإيجار السنوي الأصلي (قبل التعديلات)':'الإيجار السنوي شامل الضريبة'}<input id="eRent" type="number" step="0.01" value="${t.rent}"></label>
+    <label>${hasAm(t)?'الإيجار السنوي الأصلي (قبل التعديلات) — بدون الخدمات':'الإيجار السنوي شامل الضريبة — بدون الخدمات'}<input id="eRent" type="number" step="0.01" value="${t.rent===''?'':baseRent(t)}"></label>
+    <label>الخدمات السنوية شامل الضريبة<input id="eSvc" type="number" step="0.01" placeholder="0" value="${svcOf(t)||''}"></label>
+    <div class="full" id="eTot" style="padding:8px 12px;border-radius:8px;background:var(--surface-2);font-size:13px"></div>
     <label>دورية الدفع<select id="eEvery">${[[1,'شهري'],[2,'كل شهرين'],[3,'ربع سنوي'],[4,'كل 4 أشهر'],[6,'نصف سنوي'],[12,'سنوي']].map(o=>`<option value="${o[0]}" ${+t.everyMonths===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></label>
     <label>${hasAm(t)?'قيمة الدفعة الأصلية':'قيمة الدفعة'}<input id="eInst" type="number" step="0.01" value="${t.installment}"></label>
     <label>الاستحقاق القادم<input id="eNext" type="date" value="${t.nextDue||''}"></label>
@@ -1264,11 +1312,13 @@ function tenantForm(t){
     <label class="full">ملاحظات<textarea id="eNote">${esc(t.notes||'')}</textarea></label></div>
     <div class="legend">«ساري» يتحول تلقائياً إلى «منتهي» بعد تاريخ نهاية العقد.</div>`,
     `<button class="btn pri" id="eSave">حفظ</button><button class="btn" id="eCancel">إلغاء</button>`);
-  const calc=()=>{const r=+val('eRent'),e=+val('eEvery');if(r>0&&!$('#eInst').dataset.touched)$('#eInst').value=Math.round(r*e/12*100)/100};
-  $('#eInst').oninput=()=>$('#eInst').dataset.touched=1;$('#eRent').oninput=calc;$('#eEvery').onchange=calc;
+  const tot=()=>r2((+val('eRent')||0)+(+val('eSvc')||0));
+  const showTot=()=>{$('#eTot').innerHTML='الإجمالي السنوي (إيجار + خدمات): <b class="num">'+fmt(tot())+'</b> — وهو المبلغ الذي تُحسب منه الدفعات والمطالبات'};
+  const calc=()=>{const r=tot(),e=+val('eEvery');showTot();if(r>0&&!$('#eInst').dataset.touched)$('#eInst').value=Math.round(r*e/12*100)/100};
+  showTot();$('#eInst').oninput=()=>$('#eInst').dataset.touched=1;$('#eRent').oninput=calc;$('#eSvc').oninput=calc;$('#eEvery').onchange=calc;
   $('#eCancel').onclick=()=>isNew?close():openTenant(t.id);
   $('#eSave').onclick=async()=>{if(!val('eName')){toast('أدخل اسم المستأجر');return}
-    const nt={...t,name:val('eName'),no:+val('eNo')||t.no,unit:val('eUnit'),rent:+val('eRent')||0,everyMonths:+val('eEvery'),installment:+val('eInst')||0,nextDue:val('eNext')||null,start:val('eStart')||null,end:val('eEnd')||null,state:val('eState'),contact:val('eCon'),phone:val('ePhone'),email:val('eMail'),link:val('eLink'),notes:val('eNote')};
+    const nt={...t,name:val('eName'),contractNo:val('eCNo'),no:+val('eNo')||t.no,unit:val('eUnit'),rent:tot(),services:+val('eSvc')||0,everyMonths:+val('eEvery'),installment:+val('eInst')||0,nextDue:val('eNext')||null,start:val('eStart')||null,end:val('eEnd')||null,state:val('eState'),contact:val('eCon'),phone:val('ePhone'),email:val('eMail'),link:val('eLink'),notes:val('eNote')};
     if(await put('tenants',nt)){
       if(!isNew&&nt.name!==t.name){for(const d of dues.filter(x=>x.tenantId===t.id))await put('dues',{...d,tenantName:nt.name})}
       toast('تم الحفظ');openTenant(nt.id)}};
@@ -1277,7 +1327,7 @@ function tenantForm(t){
 /* ---------- export ---------- */
 async function exportXlsx(dl){
   const wb=XLSX.utils.book_new();
-  const T=tenants.slice().sort((a,b)=>(a.no||0)-(b.no||0)).map(t=>({'م':t.no,'المستأجر':t.name,'المحل':t.unit,'الإيجار السنوي الأصلي':+t.rent||0,'الإيجار السنوي الحالي':curRent(t),'قيمة الدفعة الحالية':instAt(t,TODAY),'عدد تعديلات العقد':(t.amendments||[]).length,'الدورية (أشهر)':t.everyMonths,'الاستحقاق القادم':t.nextDue,'بداية العقد':t.start,'نهاية العقد':t.end,'حالة العقد':STATE[contractState(t)],'رصيد مفتوح':tenantOpen(t.id),'المسؤول':t.contact,'الجوال':t.phone,'البريد':t.email,'ClickUp':t.link,'ملاحظات':t.notes}));
+  const T=tenants.slice().sort((a,b)=>(a.no||0)-(b.no||0)).map(t=>({'م':t.no,'رقم العقد':t.contractNo||'','المستأجر':t.name,'المحل':t.unit,'الإيجار بدون خدمات':baseRent(t),'الخدمات السنوية':svcOf(t),'الإيجار السنوي الأصلي':+t.rent||0,'الإيجار السنوي الحالي':curRent(t),'قيمة الدفعة الحالية':instAt(t,TODAY),'عدد تعديلات العقد':(t.amendments||[]).length,'الدورية (أشهر)':t.everyMonths,'الاستحقاق القادم':t.nextDue,'بداية العقد':t.start,'نهاية العقد':t.end,'حالة العقد':STATE[contractState(t)],'رصيد مفتوح':tenantOpen(t.id),'المسؤول':t.contact,'الجوال':t.phone,'البريد':t.email,'ClickUp':t.link,'ملاحظات':t.notes}));
   const D=dues.slice().sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).map(d=>({'المستأجر':d.tenantName,'الفترة':d.period,'الاستحقاق':d.dueDate,'المبلغ':+d.amount||0,'الخصم':discOf(d),'الصافي':netOf(d),'سبب الخصم':d.discount?d.discount.reason||'':'','المدفوع':paidOf(d),'المتبقي':remOf(d),'الحالة':ST[dueStatus(d)][0],'الفوترة':BILL[billOf(d)][0],'رقم الفاتورة':d.invNo||'','تاريخ الفاتورة':d.invDate||'','المرحلة':d.stage,'تاريخ المرحلة':d.stageDate,'أيام في المرحلة':stageAge(d),'آخر ملاحظة':lastNote(d)}));
   const P=[];dues.forEach(d=>(d.payments||[]).forEach(p=>P.push({'المستأجر':d.tenantName,'الفترة':d.period,'التاريخ':p.date,'المبلغ':+p.amount,'الطريقة':p.method,'ملاحظة':p.note})));
   [[D,'المطالبات'],[T,'العقود'],[P,'الدفعات المستلمة']].forEach(([rows,n])=>{const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{'':''}]);ws['!views']=[{RTL:true}];XLSX.utils.book_append_sheet(wb,ws,n)});
