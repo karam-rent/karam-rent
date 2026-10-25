@@ -1260,18 +1260,21 @@ function docList(t){const L=(t.docs||[]).slice().sort((a,b)=>(b.at||'').localeCo
     <div class="docs">${L.length?L.map(d=>`<div class="doc"><span class="ic">${docIcon(d.name||'')}</span><div class="nm" data-docopen="${esc(d.id)}" title="فتح"><b>${esc(d.name||'مستند')}</b><small>${fsz(+d.size||0)} · ${d.at?fd(d.at.slice(0,10)):''}${d.by?' · '+esc(d.by.split('@')[0]):''}</small></div><button class="btn sm ghost" data-docopen="${esc(d.id)}">فتح</button><button class="btn sm ghost danger" data-docdel="${esc(d.id)}">حذف</button></div>`).join(''):'<div class="empty" style="padding:6px 0">لا توجد مستندات — أرفق العقد الموقّع أو أي مستند متعلق به (PDF أو صورة أو Word).</div>'}</div></div>`;
 }
 function docErr(e){const m=(e&&(e.message||e.error))||String(e);return /bucket not found|not found/i.test(m)?'خاصية المرفقات غير مفعّلة بعد — شغّل ملف 8_contract_docs.sql في Supabase':/row-level security|unauthorized|not allowed|403/i.test(m)?'لا تملك صلاحية على المستندات':m}
+async function uploadDocs(id,files){const added=[];
+  for(const f of files){
+    const ext=((f.name.match(/\.([a-z0-9]{1,6})$/i)||[])[1]||'bin').toLowerCase();
+    const key=CUR+'/'+id+'/'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)+'.'+ext;
+    const {error}=await sb.storage.from('contracts').upload(key,f,{contentType:f.type||'application/octet-stream',upsert:false});
+    if(error){toast(docErr(error));break}
+    added.push({id:uid('f'),key,name:f.name,size:f.size,type:f.type||'',at:new Date().toISOString(),by:MY_EMAIL});}
+  return added}
 function bindDocs(id){
   const add=$('#tDocAdd'),inp=$('#tDocFile');if(!add||!inp)return;
   add.onclick=()=>inp.click();
   inp.onchange=async()=>{const files=[...inp.files];inp.value='';if(!files.length)return;
     const big=files.filter(f=>f.size>DOC_MAX);if(big.length){toast('الملف أكبر من 20 ميجا: '+big[0].name);return}
-    add.disabled=true;add.textContent='جارٍ الرفع…';const added=[];
-    try{for(const f of files){
-        const ext=((f.name.match(/\.([a-z0-9]{1,6})$/i)||[])[1]||'bin').toLowerCase();
-        const key=CUR+'/'+id+'/'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)+'.'+ext;
-        const {error}=await sb.storage.from('contracts').upload(key,f,{contentType:f.type||'application/octet-stream',upsert:false});
-        if(error){toast(docErr(error));break}
-        added.push({id:uid('f'),key,name:f.name,size:f.size,type:f.type||'',at:new Date().toISOString(),by:MY_EMAIL});}
+    add.disabled=true;add.textContent='جارٍ الرفع…';
+    try{const added=await uploadDocs(id,files);
       if(added.length){const cur=tById(id);if(await put('tenants',{...cur,docs:[...(cur.docs||[]),...added]}))toast(added.length>1?'تم إرفاق '+added.length+' مستندات':'تم إرفاق المستند')}}
     finally{openTenant(id)}};
   document.querySelectorAll('[data-docopen]').forEach(el=>el.onclick=async()=>{
@@ -1334,7 +1337,8 @@ function tenantForm(t){
     <label>الجوال<input id="ePhone" inputmode="tel" value="${esc(t.phone||'')}"></label>
     <label>البريد الإلكتروني<input id="eMail" type="email" value="${esc(t.email||'')}"></label>
     <label class="full">رابط مهمة ClickUp<input id="eLink" value="${esc(t.link||'')}"></label>
-    <label class="full">ملاحظات<textarea id="eNote">${esc(t.notes||'')}</textarea></label></div>
+    <label class="full">ملاحظات<textarea id="eNote">${esc(t.notes||'')}</textarea></label>
+    <div class="full"><h4 style="display:flex;align-items:center;gap:8px;margin:4px 0 6px">📎 مستندات العقد${(t.docs||[]).length?' <small style="color:var(--muted);font-weight:400">('+t.docs.length+' مرفق سابقاً)</small>':''}<button type="button" class="btn sm" id="eDocAdd" style="margin-inline-start:auto">+ إرفاق مستند</button><input type="file" id="eDocFile" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx"></h4><div class="docs" id="eDocs"></div></div></div>
     <div class="legend">«ساري» يتحول تلقائياً إلى «منتهي» بعد تاريخ نهاية العقد.</div>`,
     `<button class="btn pri" id="eSave">حفظ</button><button class="btn" id="eCancel">إلغاء</button>`);
   const tot=()=>r2((+val('eRent')||0)+(+val('eSvc')||0));
@@ -1342,11 +1346,17 @@ function tenantForm(t){
   const calc=()=>{const r=tot(),e=+val('eEvery');showTot();if(r>0&&!$('#eInst').dataset.touched)$('#eInst').value=Math.round(r*e/12*100)/100};
   showTot();$('#eInst').oninput=()=>$('#eInst').dataset.touched=1;$('#eRent').oninput=calc;$('#eSvc').oninput=calc;$('#eEvery').onchange=calc;
   $('#eCancel').onclick=()=>isNew?close():openTenant(t.id);
+  let pend=[];const showPend=()=>{$('#eDocs').innerHTML=pend.length?pend.map((f,i)=>`<div class="doc"><span class="ic">${docIcon(f.name)}</span><div class="nm"><b>${esc(f.name)}</b><small>${fsz(f.size)} · يُرفع عند الحفظ</small></div><button type="button" class="btn sm ghost danger" data-pdel="${i}">إزالة</button></div>`).join(''):'<div class="empty" style="padding:4px 0">أرفق العقد الموقّع أو أي مستند متعلق به (PDF أو صورة أو Word) — حد الملف 20 ميجا.</div>';
+    document.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{pend.splice(+b.dataset.pdel,1);showPend()})};
+  showPend();$('#eDocAdd').onclick=()=>$('#eDocFile').click();
+  $('#eDocFile').onchange=e=>{const fs=[...e.target.files];e.target.value='';const big=fs.filter(f=>f.size>DOC_MAX);if(big.length)toast('الملف أكبر من 20 ميجا: '+big[0].name);pend=pend.concat(fs.filter(f=>f.size<=DOC_MAX));showPend()};
   $('#eSave').onclick=async()=>{if(!val('eName')){toast('أدخل اسم المستأجر');return}
     const nt={...t,name:val('eName'),contractNo:val('eCNo'),no:+val('eNo')||t.no,unit:val('eUnit'),rent:tot(),services:+val('eSvc')||0,everyMonths:+val('eEvery'),installment:+val('eInst')||0,nextDue:val('eNext')||null,start:val('eStart')||null,end:val('eEnd')||null,state:val('eState'),contact:val('eCon'),phone:val('ePhone'),email:val('eMail'),link:val('eLink'),notes:val('eNote')};
+    $('#eSave').disabled=true;
     if(await put('tenants',nt)){
       if(!isNew&&nt.name!==t.name){for(const d of dues.filter(x=>x.tenantId===t.id))await put('dues',{...d,tenantName:nt.name})}
-      toast('تم الحفظ');openTenant(nt.id)}};
+      if(pend.length){toast('جارٍ رفع المستندات…');const added=await uploadDocs(nt.id,pend);if(added.length){const cur=tById(nt.id);await put('tenants',{...cur,docs:[...(cur.docs||[]),...added]})}}
+      toast('تم الحفظ');openTenant(nt.id)}else $('#eSave').disabled=false};
 }
 
 /* ---------- export ---------- */
